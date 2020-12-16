@@ -1,18 +1,18 @@
-import scalatex.ScalatexReadme
+// present ambition level is just to build ammonite-ops
 
-lazy val readme = ScalatexReadme(
-  projectId = "readme",
-  wd = file(""),
-  url = "https://github.com/lihaoyi/ammonite/tree/master",
-  source = "Index"
-).settings(
-  scalaVersion := "2.12.3",
-  libraryDependencies += "com.lihaoyi" %% "fansi" % "0.2.3",
-  envVars in Test := Map(
-    "AMMONITE_ASSEMBLY" -> sys.env("AMMONITE_ASSEMBLY"),
-    "AMMONITE_SHELL" -> sys.env("AMMONITE_SHELL")
-  ),
-  fork := true,
-  baseDirectory in (Compile, run) := (baseDirectory in (Compile, run)).value / "..",
-  (unmanagedSources in Compile) += file(sys.env("CONSTANTS_FILE"))
-)
+scalaVersion := "2.13.4"
+organization := "com.lihaoyi"
+name := "ammonite-ops"
+
+libraryDependencies += "org.scala-lang.modules" %% "scala-collection-compat" % "2.1.2"
+libraryDependencies += "com.lihaoyi" %% "os-lib" % "0.7.1"
+
+testFrameworks := Seq(new TestFramework("utest.runner.Framework"))
+libraryDependencies += "com.lihaoyi" %% "utest" % "0.7.4" % Test
+
+Compile / unmanagedSourceDirectories += baseDirectory.value / "ops" / "src" / "main" / "scala"
+Compile / unmanagedSourceDirectories += baseDirectory.value / "ops" / "src" / "main" / "scala-2.13"
+Test / unmanagedSourceDirectories += baseDirectory.value / "ops" / "src" / "test" / "scala"
+Test / unmanagedResourceDirectories += baseDirectory.value / "ops" / "src" / "test" / "resources"
+
+Compile / scalacOptions ++= Seq("-feature", "-deprecation")
