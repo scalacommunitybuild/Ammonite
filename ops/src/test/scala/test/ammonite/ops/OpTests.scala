@@ -136,7 +136,7 @@ object OpTests extends TestSuite{
         }
         test("shallow"){
           val d = testPath/'moving2
-          mkdir(d)
+          mkdir!(d)
           write(d/"A.scala", "AScala")
           write(d/"B.scala", "BScala")
           write(d/"A.py", "APy")

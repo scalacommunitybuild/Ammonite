@@ -280,6 +280,7 @@ object ExampleTests extends TestSuite{
     }
     test("concatAll"){if (Unix()){
 
+      rm! pwd/'target/'test/"omg.txt"
       ls.rec! pwd |? (_.ext == "scala") | read |> (
         write(pwd/'target/'test/"omg.txt", _, createFolders = true)
       )
