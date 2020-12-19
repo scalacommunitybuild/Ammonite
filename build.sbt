@@ -1,4 +1,4 @@
-ThisBuild / scalaVersion := "2.13.3"
+ThisBuild / scalaVersion := "2.13.4"
 ThisBuild / organization := "com.lihaoyi"
 ThisBuild / Compile / scalacOptions ++= Seq("-feature", "-deprecation")
 ThisBuild / libraryDependencies += "com.lihaoyi" %% "utest" % "0.7.5" % Test
