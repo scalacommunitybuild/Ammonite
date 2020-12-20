@@ -10,7 +10,7 @@ import utest._
 object SessionTests extends TestSuite{
 
   val bareSrc =
-    """pwd/'shell/'src/'main/'resources/'ammonite/'shell/"example-predef-bare.sc""""
+    """pwd/'src/'main/'resources/'ammonite/'shell/"example-predef-bare.sc""""
 
   val tests = Tests{
     val check = new TestRepl()
@@ -50,7 +50,7 @@ object SessionTests extends TestSuite{
 
         @ import ammonite.ops.ImplicitWd
 
-        @ %%ls "ops/src/test"
+        @ %%ls "../ops/src/test"
         res3: CommandResult =
         resources
         scala

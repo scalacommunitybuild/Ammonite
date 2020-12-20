@@ -6,7 +6,7 @@ ThisBuild / testFrameworks := Seq(new TestFramework("utest.runner.Framework"))
 ThisBuild / Test / parallelExecution := false
 
 lazy val root = project.in(file("."))
-  .aggregate(ops, terminal, util, interpApi, runtime, replApi, repl, interp)
+  .aggregate(ops, terminal, util, interpApi, runtime, replApi, repl, interp, amm, shell)
   .settings(
     publish / skip := true,
   )
@@ -64,3 +64,14 @@ val repl = (project in file("amm/repl")).settings(
   libraryDependencies += "org.javassist" % "javassist" % "3.21.0-GA",
   libraryDependencies += "com.github.javaparser" % "javaparser-core" % "3.2.5",
 ).dependsOn(replApi, terminal, interp)
+
+val amm = (project in file("amm")).settings(
+  name := "ammonite",
+  libraryDependencies += "org.scala-lang.modules" %% "scala-java8-compat" % "0.9.0" % Test,
+).dependsOn(repl % "compile->compile;test->test")
+
+val shell = (project in file("shell")).settings(
+  name := "ammonite-shell",
+  Test / fork := true,
+  Test / envVars := Map("AMMONITE_SHELL" -> (Compile / packageBin).value.toString),
+).dependsOn(amm % "compile->compile;test->test")
