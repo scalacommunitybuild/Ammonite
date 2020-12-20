@@ -6,7 +6,7 @@ ThisBuild / testFrameworks := Seq(new TestFramework("utest.runner.Framework"))
 ThisBuild / Test / parallelExecution := false
 
 lazy val root = project.in(file("."))
-  .aggregate(ops, terminal, util, interpApi, runtime, replApi)
+  .aggregate(ops, terminal, util, interpApi, runtime, replApi, repl, interp)
   .settings(
     publish / skip := true,
   )
@@ -25,7 +25,7 @@ val terminal = (project in file("terminal")).settings(
 )
 
 val util = (project in file("amm/util")).settings(
-  name := "ammonite-terminal",
+  name := "ammonite-util",
   libraryDependencies += "org.scala-lang" % "scala-reflect" % scalaVersion.value,
   libraryDependencies += "org.scala-lang.modules" %% "scala-collection-compat" % "2.1.2",
   libraryDependencies += "com.lihaoyi" %% "os-lib" % "0.7.1",
@@ -49,7 +49,18 @@ val runtime = (project in file("amm/runtime")).settings(
   libraryDependencies += "com.lihaoyi" %% "upickle" % "1.2.0",
 ).dependsOn(replApi)
 
-// val interp = (project in file("amm/interp")).settings(
-//   name := "ammonite-interp",
-//   Compile / unmanagedSourceDirectories += baseDirectory.value / "src" / "main" / "scala-2.13.1+"
-// ).dependsOn(interpApi)
+val interp = (project in file("amm/interp")).settings(
+  name := "ammonite-interp",
+  libraryDependencies += "com.lihaoyi" %% "scalaparse" % "2.3.0",
+  libraryDependencies += "org.scala-lang.modules" %% "scala-xml" % "1.2.0",
+  libraryDependencies += "ch.epfl.scala" % "bsp4j" % "2.0.0-M6",
+  libraryDependencies += "org.scalameta" %% "trees" % "4.4.0",
+  Compile / unmanagedSourceDirectories += baseDirectory.value / "src" / "main" / "scala-2.13.1+",
+  Compile / unmanagedSourceDirectories += baseDirectory.value / "src" / "main" / "scala-2.12.10-2.13.1+",
+).dependsOn(runtime)
+
+val repl = (project in file("amm/repl")).settings(
+  name := "ammonite-repl",
+  libraryDependencies += "org.javassist" % "javassist" % "3.21.0-GA",
+  libraryDependencies += "com.github.javaparser" % "javaparser-core" % "3.2.5",
+).dependsOn(replApi, terminal, interp)
