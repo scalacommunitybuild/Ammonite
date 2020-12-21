@@ -117,14 +117,6 @@ object ProjectTests extends TestSuite{
       """)
     }
 
-    test("scalaz"){
-      check.session("""
-        @ import $ivy.`org.scalaz::scalaz-core:7.2.27`, scalaz._, Scalaz._
-
-        @ (Option(1) |@| Option(2))(_ + _)
-        res1: Option[Int] = Some(3)
-      """)
-    }
     test("cats"){
       check.session("""
         @ import $ivy.`org.typelevel::cats-core:2.0.0-M4`, cats._
