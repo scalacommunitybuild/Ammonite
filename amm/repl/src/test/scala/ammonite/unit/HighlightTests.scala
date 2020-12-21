@@ -31,7 +31,7 @@ object HighlightTests extends TestSuite{
 
 
         val paths = os.walk(os.pwd).filter(_.ext == "scala")
-        for(path <- paths){
+        for(path <- paths if !os.isDir(path)){
           val code = os.read(path)
           val out = Highlighter.defaultHighlight(
             code.toVector,
