@@ -525,30 +525,6 @@ object AdvancedTests extends TestSuite{
       }
     }
 
-<<<<<<< HEAD
-||||||| 05aed517
-    test("loadURL"){
-      val sbv = {
-        val sv = scala.util.Properties.versionNumberString
-        if (sv.forall(c => c.isDigit || c == '.'))
-          sv.split('.').take(2).mkString(".")
-        else
-          sv
-      }
-      val url = "https://repo1.maven.org/maven2/" +
-        s"org/scalacheck/scalacheck_$sbv/1.14.0/scalacheck_$sbv-1.14.0.jar"
-      check.session(s"""
-        @ interp.load.cp(new java.net.URL("$url"))
-
-        @ import org.scalacheck.Gen
-        import org.scalacheck.Gen
-
-        @ val check = Gen.choose(1, 5).sample.exists(_ <= 5)
-        check: Boolean = true
-      """)
-    }
-
-=======
     test("loadURL"){
       if (check.scala2) {
         val sbv = {
@@ -572,7 +548,6 @@ object AdvancedTests extends TestSuite{
       } else "Disabled in Scala 3"
     }
 
->>>>>>> origin/main
     test("accessPressy"){
       if (check.scala2) check.session("""
         @ def typeAt(code: String, pos: Int) = {
