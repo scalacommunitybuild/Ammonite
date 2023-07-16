@@ -1,6 +1,5 @@
 package ammonite.unit
 
-import ammonite.repl.Highlighter
 import ammonite.util.Util
 import utest._
 
@@ -68,21 +67,29 @@ object ParserTests extends TestSuite{
     // Not nearly comprehensive, but hopefully if someone really borks this
     // somewhat-subtle logic around the parsers, one of these will catch it
     test("endOfCommandDetection"){
-      def assertResult(x: String, pred: Option[fastparse.Parsed[_]] => Boolean) = {
-        val res = ammonite.interp.Parsers.split(x)
+      def assertResult(x: String, pred: Option[Either[String, _]] => Boolean) = {
+        val res = ammonite.compiler.Parsers.split(x)
         assert(pred(res))
       }
       def assertIncomplete(x: String) = assertResult(x, _.isEmpty)
       def assertComplete(x: String) = assertResult(x, _.isDefined)
       def assertInvalid(x: String) =
-        assertResult(x, res => res.isDefined && res.get.isInstanceOf[fastparse.Parsed.Failure])
+        assertResult(x, res => res.isDefined && res.get.isLeft)
 
       test("endOfCommand"){
         test - assertComplete("{}")
         test - assertComplete("foo.bar")
         test - assertComplete("foo.bar // line comment")
         test - assertComplete("foo.bar /* block comment */")
-        test - assertComplete("va va") // postfix
+        test - {
+          val sv = ammonite.compiler.CompilerBuilder.scalaVersion
+          // I hope that one not passing doesn't have unintended consequences…
+          // Once we can use coursier/interface#256 here, use it to compare versions
+          // if (coursierapi.Version.compare("3.1.3", sv) <= 0)
+          if (sv.startsWith("2.") || sv.startsWith("3.0.") || (sv.startsWith("3.1.") && sv != "3.1.3"))
+            assertComplete("va va") // postfix
+          else "Disabled"
+        }
         test - assertComplete("")
         test - assertComplete("""
           {

@@ -9,15 +9,10 @@
 [patreon-badge]: https://img.shields.io/badge/patreon-sponsor-ff69b4.svg
 [patreon-link]: https://www.patreon.com/lihaoyi
 
-This is where the code for the [Ammonite](https://lihaoyi.github.io/Ammonite) 
+This is where the code for the [Ammonite](https://ammonite.io) 
 project lives:
 
-- [Ammonite-REPL](https://lihaoyi.github.io/Ammonite), the improved Scala REPL
-- [Ammonite-Ops](https://lihaoyi.github.io/Ammonite/#Ammonite-Ops), the Scala 
-  file-system library
-- [Ammonite-Shell](https://lihaoyi.github.io/Ammonite/#Ammonite-Shell), the 
-  Bash-replacement system shell
-
+- [Ammonite-REPL](https://ammonite.io), the improved Scala REPL
 
 If you use Ammonite and like it, you will probably enjoy the following book by the Author:
 
@@ -37,7 +32,7 @@ Ammonite source code itself.
 If you are interested in living more "on the edge", we also publish artifacts 
 and the doc-site every commit; the doc-site is available at
 
-- http://www.lihaoyi.com/Ammonite/#UnstableVersions
+- https://ammonite.io/#UnstableVersions
 
 And contains instructions on how to download the per-commit executable or 
 depend on the per-commit maven artifact.
@@ -50,20 +45,18 @@ If you use Ammonite and like it, please support us by donating to our Patreon:
 
 The layout of the repository is roughly:
 
-- `ops/` is [Ammonite-Ops](https://lihaoyi.github.io/Ammonite/#Ammonite-Ops)
-- `amm/` is [Ammonite](https://lihaoyi.github.io/Ammonite)'s core, REPL and script runner
-- `shell/` is [Ammonite-Shell](https://lihaoyi.github.io/Ammonite/#Ammonite-Shell)
+- `amm/` is [Ammonite](https://ammonite.io)'s core, REPL and script runner
 - `terminal/` is the JLine re-implementation used by Ammonite-REPL to provide 
   syntax highlighting and multiline editing
-- `readme/` is the source code for the [Documentation](https://lihaoyi.github.io/Ammonite/#Ammonite-Ops), 
-  written in [Scalatex](https://lihaoyi.github.io/Scalatex/).
+- `readme/` is the source code for the [Documentation](https://ammonite.io/#Ammonite-Ops), 
+  written in [Scalatex](https://www.lihaoyi.com/Scalatex/).
 - `published/` is a synthetic project used for publishing, excluding the readme 
   and integration tests
 
 For more detailed information, check out the internals documentation for 
 high-level overviews of some interesting facets of the codebase
 
-- [Internals Documentation](https://github.com/lihaoyi/Ammonite/tree/master/internals-docs)
+- [Internals Documentation](https://github.com/com-lihaoyi/Ammonite/tree/main/internals-docs)
 
 ## Common Commands
 
@@ -85,12 +78,7 @@ Although most features should be unit tested, it's still useful to fire up a REP
   command. You can also pass in the path to a `.sc` file to run it using
   Ammonite's script runner
   
-- `mill -i -w shell[2.12.6].test.run` brings up a fully-loaded shell with all filesystem
-  utilities included: `wd`, `cd!`, autocomplete for filesystem paths, and more. 
-  This uses `readme/resources/example-predef.scala` instead of your default 
-  predef, for easier experimentation and development.
-  
-- `sbt -i -w integration[2.12.6].test.run` runs the trivial main method in the
+- `mill -i -w integration[2.12.6].test.run` runs the trivial main method in the
   `integration` subproject, letting you manually test running Ammonite
   programmatically, whether through `run` or `debug`
 
@@ -105,36 +93,37 @@ Although most features should be unit tested, it's still useful to fire up a REP
 
 ### Automated Testing
 
-While working on an arbitrary `xyz` subproject, `sbt ~xyz/test` runs tests after every change. `amm/test` can be a bit slow because of the amount of code it compiles, so you may want to specify the test manually via `amm/test-only -- ammonite.TestObject.path.to.test`.
+While working on an arbitrary `xyz` subproject, `mill -w xyz.test` runs tests after every change.
+`./mill 'amm[2.13.8].test'` can be a bit slow because of the amount of code it compiles, so you may want to specify the test manually via `./mill 'amm[2.13.8].test path.to.test'`.
 
-- `ops/test` tests the filesystem operations, without any REPL present
-- `amm/test` tests the Ammonite-REPL/Script-runner, without filesystem-shell integration.
-- `terminal/test` tests the readline re-implementation: keyboard navigation, shortcuts, editing, without any filesystem/scala-repl logic
-- `shell/test` tests the integration between the standalone `ops/` and `amm/` projects: features like `cd!`/`wd`, path-completion, ops-related pretty-printing and tools
-- `integration/test` kicks off the integration tests, which bundle `amm/` and `shell/` into their respective jars and invoke them as subprocesses. Somewhat slow, but exercises all the command-line-parsing stuff that the other unit tests do not exercise, and makes sure that everything works when run from `.jar`s instead of loose class-files
+- `./mill -i 'amm[2.13.8].test'` tests the Ammonite Script-runner, without filesystem-shell integration.
+- `./mill -i 'amm.repl[2.13.8].test'` tests the Ammonite-REPL.
+- `./mill -i 'terminal[2.13.8].test'` tests the readline re-implementation: keyboard navigation, shortcuts, editing, without any filesystem/scala-repl logic
+- `./mill -i 'integration[2.13.8].test'` kicks off the integration tests, which bundle `amm/` and `shell/` into their respective jars and invoke them as subprocesses. Somewhat slow, but exercises all the command-line-parsing stuff that the other unit tests do not exercise, and makes sure that everything works when run from `.jar`s instead of loose class-files
+- `./mill -i 'sshd[2.13.8].test'` tests the remote Ammonite-REPL over sshd.
 
 ### Publishing
 
 - Publishing is automatic, controlled by scripts in the `ci/` folder.
 
-- Every commit that lands in master will publish a new
-  [unstable version](http://www.lihaoyi.com/Ammonite/#UnstableVersions),
+- Every commit that lands in main will publish a new
+  [unstable version](https://ammonite.io/#UnstableVersions),
   that you can already use and download. This includes publishing the unstable version
   to maven central to the
-  [snapshot-commit-uploads](https://github.com/lihaoyi/Ammonite/releases/tag/snapshot-commit-uploads)
+  [snapshot-commit-uploads](https://github.com/com-lihaoyi/Ammonite/releases/tag/snapshot-commit-uploads)
   tag, and updating the documentation-site so it's
-  [Unstable Version](http://www.lihaoyi.com/Ammonite/#UnstableVersions) download
+  [Unstable Version](https://ammonite.io/#UnstableVersions) download
   instructions to point to it, though the "main" download/install instructions
   in the doc-site will not be changed.
 
-- Every commit that lands in master *with a tag* will re-publish a stable version
+- Every commit that lands in main *with a tag* will re-publish a stable version
   to maven central and upload a new versioned release (using the tag as the
   version) and the doc-site is updated so the main download/install instructions
   point at the new published stable version.
 
-In general, if you land a change in master, once CI completes (1-2hrs) you
+In general, if you land a change in main, once CI completes (1-2hrs) you
 should be able to download it via the
-[Unstable Version](http://www.lihaoyi.com/Ammonite/#UnstableVersions)
+[Unstable Version](https://ammonite.io/#UnstableVersions)
 instructions and make use of your changes standalone or in an SBT project.
 
 Occasionally, the CI job building and publishing one of the above steps
@@ -158,7 +147,7 @@ And possibly:
 
 - **All code PRs should come with**: a meaningful description, inline-comments for important things, unit tests (positive and negative), and a green build in [CI](https://travis-ci.org/lihaoyi/Ammonite)
 - **Try to keep lines below 80 characters width**, with a hard limit of 100 characters.
-- **PRs for features should generally come with *something* added to the [Documentation](https://lihaoyi.github.io/Ammonite)**, so people can discover that it exists
+- **PRs for features should generally come with *something* added to the [Documentation](https://ammonite.io)**, so people can discover that it exists
 - **Be prepared to discuss/argue-for your changes if you want them merged**! You will probably need to refactor so your changes fit into the larger codebase
 - **If your code is hard to unit test, and you don't want to unit test it, that's ok**. But be prepared to argue why that's the case!
 - **It's entirely possible your changes won't be merged**, or will get ripped out later. This is also the case for my changes, as the Author!

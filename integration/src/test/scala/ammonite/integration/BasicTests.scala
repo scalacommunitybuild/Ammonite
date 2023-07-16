@@ -3,6 +3,8 @@ package ammonite.integration
 import utest._
 import ammonite.util.Util
 import TestUtils._
+
+import java.io.File
 /**
  * Run a small number of scripts using the Ammonite standalone executable,
  * to make sure that this works. Otherwise it tends to break since the
@@ -51,7 +53,7 @@ object BasicTests extends TestSuite{
           scriptAddr
           // Somehow this is being set of travis and causing weird errors/warnings
         ).call(env = Map("_JAVA_OPTIONS" -> null))
-        assert(evaled.out.trim == "Script Worked!!" && evaled.err.string.isEmpty)
+        assert(evaled.out.trim == "Script Worked!!" && evaled.err.text().isEmpty)
       }
     }
     test("scalacNotLoadedByCachedScripts"){
@@ -64,26 +66,37 @@ object BasicTests extends TestSuite{
         os.rel/'basic/"Print.sc",
         tmpDir
       )
-      val count1 = substrCount(evaled1.out.trim, "scala.tools.nsc")
-      val count2 = substrCount(evaled2.out.trim, "scala.tools.nsc")
+      val compilerPackage =
+        if (isScala2) "scala.tools.nsc"
+        else "dotty.tools.dotc"
+      val count1 = substrCount(evaled1.out.trim, compilerPackage)
+      val count2 = substrCount(evaled2.out.trim, compilerPackage)
       //These numbers might fail in future but basic point is to keep count2
       //very low whereas count1 will be inevitably bit higher
-      assert(count1 > 10)
-      assert(count2 < 5)
+      if (isScala2) {
+        assert(count1 > 10)
+        assert(count2 < 5)
+      } else {
+        assert(count1 > 100)
+        assert(count2 < 15)
+      }
     }
     test("fastparseNotLoadedByCachedScritps"){
+      val parserPackage =
+        if (isScala2) "fastparse"
+        else "dotty.tools.dotc.parsing"
       val tmpDir = os.temp.dir()
       val evaled1 = execWithJavaOptsSet(
         os.rel/'basic/"Print.sc",
         tmpDir
       )
-      assert(evaled1.out.trim.contains("fastparse"))
+      assert(evaled1.out.trim.contains(parserPackage))
 
       val evaled2 = execWithJavaOptsSet(
         os.rel/'basic/"Print.sc",
         tmpDir
         )
-      assert(!evaled2.out.trim.contains("fastparse"))
+      assert(!evaled2.out.trim.contains(parserPackage))
     }
 
 
@@ -107,32 +120,6 @@ object BasicTests extends TestSuite{
       }
     }
 
-
-    test("shell"){
-      // make sure you can load the example-predef.sc, have it pull stuff in
-      // from ivy, and make use of `cd!` and `wd` inside the executed script.
-      val res = os.proc(
-        executable,
-        "--thin",
-        "--no-home-predef",
-        "--predef",
-        exampleBarePredef,
-        "-c",
-        """val x = wd
-        |@
-        |cd! 'amm/'src
-        |@
-        |println(wd relativeTo x)""".stripMargin,
-        "-s"
-      ).call()
-
-      val output = res.out.trim
-
-      if (!Util.windowsPlatform)
-        // seems the script is run only until the first '@' on Windows
-        assert(output == "amm/src")
-    }
-
     // Ensure we can load the source code of the built-in Java standard library
     test("source"){
       // This fails on windows because for some reason the windows subprocess
@@ -144,7 +131,7 @@ object BasicTests extends TestSuite{
       // so it's probably fine if this doesn't work.
       //
       // Also disabled on Java 9 due to unavailability of Java lib sources
-      if (!Util.windowsPlatform && !Util.java9OrAbove) {
+      if (!Util.windowsPlatform && !Util.java9OrAbove && isScala2) {
         os.proc(
           executable,
           "--thin",
@@ -157,40 +144,47 @@ object BasicTests extends TestSuite{
             |
             |assert(snip.contains("public String substring(int beginIndex)"))
           """.stripMargin
-        ).call()
+        ).call(stdin = os.Inherit, stdout = os.Inherit)
       }
     }
 
     // Ensure we can load the source code of external libraries, which needs to
     // get pulled down together with the library code when you `import $ivy`
     test("sourceExternal"){
-      exec(os.rel/'basic / "SourceDownload.sc")
+      // Re-enable when source support is added in Scala 3
+      if (isScala2)
+        exec(os.rel/'basic / "SourceDownload.sc")
+      else
+        "Disabled in Scala 3"
     }
 
     test("classloaders"){
       val evaled = exec(os.rel / 'basic / "Resources.sc")
-      assert(evaled.out.string.contains("1745"))
+      assert(evaled.out.text().contains("1745"))
     }
     test("testSilentScriptRunning"){
       val evaled1 = exec(os.rel / 'basic/"Hello.sc")
       // check Compiling Script is being printed
 
-      assert(evaled1.err.string.contains("Compiling"))
+      assert(evaled1.err.text().contains("Compiling"))
       val evaled2 = execSilent(os.rel / 'basic/"Hello.sc")
       // make sure with `-s` flag script running is silent
-      assert(!evaled2.err.string.contains("Compiling"))
+      assert(!evaled2.err.text().contains("Compiling"))
     }
     test("testSilentRunningWithExceptions"){
       val errorMsg = intercept[os.SubprocessException]{
         exec(os.rel / 'basic/"Failure.sc")
-      }.result.err.string
+      }.result.err.text()
 
-      assert(errorMsg.contains("not found: value x"))
+      val expected =
+        if (isScala2) "not found: value x"
+        else "Not found: x"
+      assert(errorMsg.contains(expected))
     }
     test("testSilentIvyExceptions"){
       val errorMsg = intercept[os.SubprocessException]{
         exec(os.rel / 'basic/"wrongIvyCordinates.sc")
-      }.result.err.string
+      }.result.err.text()
 
 
       assert(errorMsg.contains("Failed to resolve ivy dependencies"))
@@ -225,18 +219,26 @@ object BasicTests extends TestSuite{
           )
 
           // 2. build & publish code locally
+          val compatScalaVersion =
+           if (scalaVersion.startsWith("3."))
+             // should be the right 2.13 version
+             scala.util.Properties.versionNumberString
+           else
+             scalaVersion
           os.proc("sbt", "-J-Xmx1g", "-batch", "-no-colors", "publishLocal").call(
             env = Map(
-              "SCALA_VERSION" -> scala.util.Properties.versionNumberString,
+              "SCALA_VERSION" -> compatScalaVersion,
               "FIRST_RUN" -> s"$firstRun",
               "VERSION" -> version
             ),
-            cwd = buildRoot
+            cwd = buildRoot,
+            stdin = os.Inherit,
+            stdout = os.Inherit
           )
 
           // 3. use published artifact in a script
           val evaled = execWithHome(home, os.rel / 'basic / script)
-          assert(evaled.out.string.contains(theThing))
+          assert(evaled.out.text().contains(theThing))
         }
 
         publishJarAndRunScript("thing1", "ivyResolveSnapshot1.sc", "0.1-SNAPSHOT", firstRun = true)
@@ -254,21 +256,56 @@ object BasicTests extends TestSuite{
     // in our unit test suite, but test a few cases as integration tests
     // to make sure things work end-to-end
     test("multiMain"){
-      test("positiveArgs"){
+      def positiveArgsTest() = {
         val evaled = exec(os.rel / 'basic/"MultiMain.sc", "functionB", "2", "foo")
 
-        val out = evaled.out.string
+        val out = evaled.out.text()
         assert(out == ("Hello! foofoo ." + Util.newLine))
       }
-      test("specifyMain"){
+      def specifyMainTest() = {
         val evaled = intercept[os.SubprocessException](exec(os.rel / 'basic/"MultiMain.sc"))
 
-        val out = evaled.result.err.string
+        val out = evaled.result.err.text()
         val expected = Util.normalizeNewlines(
           s"""Need to specify a sub command: mainA, functionB""".stripMargin
         )
         assert(out.contains(expected))
       }
+      test("positiveArgs"){
+        if (isScala2) positiveArgsTest()
+        else "Disabled in Scala 3"
+      }
+      test("specifyMain"){
+        if (isScala2) specifyMainTest()
+        else "Disabled in Scala 3"
+      }
+    }
+
+    test("BSP"){
+      val jsonrpc = """{"jsonrpc": "2.0", "id": 1, "method": "build/shutdown", "params": null}"""
+        .getBytes("UTF-8")
+      val input = Array(
+        s"Content-Length: ${jsonrpc.length}",
+        "\r\n" * 2
+      ).flatMap(_.getBytes("UTF-8")) ++ jsonrpc
+      val res = os.proc(TestUtils.executable, "--bsp").call(
+        stdin = input
+      )
+      assert(res.exitCode == 0)
+    }
+
+    test("predef throws") {
+      val res = os.proc(TestUtils.executable, "--predef-code", """throw new Exception("from predef")""")
+        .call(check = false, mergeErrIntoOut = true)
+      assert(res.exitCode == 1)
+      val output = res.out.lines()
+      assert(output.contains("""Exception in thread "main" java.lang.Exception: from predef"""))
+    }
+
+    test("missing JAR") {
+      val cp = Seq(TestUtils.ammAssembly, "/foo/b.jar").mkString(File.pathSeparator)
+      os.proc("java", "-cp", cp, "ammonite.AmmoniteMain", "--predef-code", """println("Hello"); sys.exit(0)""")
+        .call()
     }
   }
 }

@@ -2,7 +2,9 @@ package ammonite
 
 import java.io.PrintStream
 
-import ammonite.interp.{CodeWrapper, Interpreter, Preprocessor}
+import ammonite.compiler.{CompilerBuilder, DefaultCodeWrapper}
+import ammonite.compiler.iface.{CodeWrapper, CompilerBuilder => ICompilerBuilder}
+import ammonite.interp.Interpreter
 import ammonite.main.Defaults
 import ammonite.repl._
 import ammonite.repl.api.{FrontEnd, History, ReplLoad}
@@ -20,10 +22,13 @@ import ammonite.runtime.ImportHook
  * A test REPL which does not read from stdin or stdout files, but instead lets
  * you feed in lines or sessions programmatically and have it execute them.
  */
-class TestRepl {
+class TestRepl(compilerBuilder: ICompilerBuilder = CompilerBuilder()) { self =>
+  def scala2 = compilerBuilder.scalaVersion.startsWith("2.")
+  def scalaVersion = compilerBuilder.scalaVersion
+
   var allOutput = ""
   def predef: (String, Option[os.Path]) = ("", None)
-  def codeWrapper: CodeWrapper = CodeWrapper
+  def codeWrapper: CodeWrapper = DefaultCodeWrapper
 
   val tempDir = os.Path(
     java.nio.file.Files.createTempDirectory("ammonite-tester")
@@ -61,21 +66,28 @@ class TestRepl {
   )
   val customPredefs = Seq()
 
+  val parser = ammonite.compiler.Parsers
+
   var currentLine = 0
+  val interpParams = Interpreter.Parameters(
+    printer = printer0,
+    storage = storage,
+    wd = os.pwd,
+    colors = Ref(Colors.BlackWhite),
+    initialClassLoader = initialClassLoader,
+    alreadyLoadedDependencies = Defaults.alreadyLoadedDependencies("amm-test-dependencies.txt"),
+    importHooks = ImportHook.defaults,
+    classPathWhitelist = ammonite.repl.Repl.getClassPathWhitelist(thin = true)
+  )
   val interp = try {
     new Interpreter(
-      printer0,
-      storage = storage,
-      wd = os.pwd,
-      colors = Ref(Colors.BlackWhite),
+      compilerBuilder,
+      () => parser,
       getFrame = () => frames().head,
       createFrame = () => { val f = sess0.childFrame(frames().head); frames() = f :: frames(); f },
-      initialClassLoader = initialClassLoader,
       replCodeWrapper = codeWrapper,
       scriptCodeWrapper = codeWrapper,
-      alreadyLoadedDependencies = Defaults.alreadyLoadedDependencies("amm-test-dependencies.txt"),
-      importHooks = ImportHook.defaults,
-      classPathWhitelist = ammonite.repl.Repl.getClassPathWhitelist(thin = true)
+      parameters = interpParams
     )
 
   }catch{ case e: Throwable =>
@@ -110,8 +122,6 @@ class TestRepl {
         def history = new History(Vector())
         val colors = Ref(Colors.BlackWhite)
         def newCompiler() = interp.compilerManager.init(force = true)
-        def compiler = interp.compilerManager.compiler.compiler
-        def interactiveCompiler = interp.compilerManager.pressy.compiler
         def fullImports = interp.predefImports ++ imports
         def imports = frames().head.imports
         def usedEarlierDefinitions = frames().head.usedEarlierDefinitions
@@ -153,12 +163,16 @@ class TestRepl {
               else
                 super.print(value, ident, custom)(TPrint.implicitly[T], tcolors, classTagT)
           }
+
+        def _compilerManager = interp.compilerManager
       }
     ),
     (
       "ammonite.repl.api.FrontEndBridge",
       "frontEnd",
-      new FrontEndAPIImpl {}
+      new FrontEndAPIImpl {
+        def parser = self.parser
+      }
     )
   )
 
@@ -215,7 +229,7 @@ class TestRepl {
       // ...except for the empty 0-line fragment, and the entire fragment,
       // both of which are complete.
       for (incomplete <- commandText.inits.toSeq.drop(1).dropRight(1)){
-        assert(ammonite.interp.Parsers.split(incomplete.mkString(Util.newLine)).isEmpty)
+        assert(ammonite.compiler.Parsers.split(incomplete.mkString(Util.newLine)).forall(_.isLeft))
       }
 
       // Finally, actually run the complete command text through the
@@ -230,7 +244,24 @@ class TestRepl {
 
       if (expected.startsWith("error: ")) {
         val strippedExpected = expected.stripPrefix("error: ")
-        assert(error.contains(strippedExpected))
+        val error0 =
+          if (scala2) error
+          else error.stripMargin('|')
+
+        @annotation.tailrec
+        def contains(output: List[String], expected: List[String]): Boolean =
+          expected match {
+            case Nil => true
+            case h :: t =>
+              output match {
+                case Nil => false
+                case h0 :: t0 =>
+                  val remaining = if (h0.contains(h)) t else expected
+                  contains(t0, remaining)
+              }
+          }
+
+        assert(contains(error0.linesIterator.toList, strippedExpected.linesIterator.toList))
 
       }else if (expected.startsWith("warning: ")){
         val strippedExpected = expected.stripPrefix("warning: ")
@@ -320,7 +351,11 @@ class TestRepl {
     warningBuffer.clear()
     errorBuffer.clear()
     infoBuffer.clear()
-    val splitted = ammonite.interp.Parsers.split(input).get.get.value
+    val splitted = ammonite.compiler.Parsers.split(input) match {
+      case None => sys.error(s"No result when splitting input '$input'")
+      case Some(Left(error)) => sys.error(s"Error when splitting input '$input': $error")
+      case Some(Right(stmts)) => stmts
+    }
     val processed = interp.processLine(
       input,
       splitted,
@@ -378,4 +413,7 @@ class TestRepl {
       throw e
     }
 
+  def notFound(name: String): String =
+    if (scala2) s"not found: value $name"
+    else s"Not found: $name"
 }

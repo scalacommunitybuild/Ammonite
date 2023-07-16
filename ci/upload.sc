@@ -1,18 +1,21 @@
 #!/usr/bin/env amm
-import ammonite.ops._
 
 @main
-def apply(uploadedFile: Path,
+def apply(uploadedFile: os.Path,
           tagName: String,
           uploadName: String,
-          authKey: String): String = {
+          authKey: String,
+          ghOrg: String,
+          ghRepo: String): String = {
   println("upload.apply")
   println(uploadedFile)
   println(tagName)
   println(uploadName)
   println(authKey)
+  println(ghOrg)
+  println(ghRepo)
   val body = requests.get(
-    "https://api.github.com/repos/lihaoyi/Ammonite/releases/tags/" + tagName,
+    s"https://api.github.com/repos/${ghOrg}/${ghRepo}/releases/tags/" + tagName,
     headers = Seq("Authorization" -> s"token $authKey"),
   )
 
@@ -24,7 +27,7 @@ def apply(uploadedFile: Path,
 
 
   val uploadUrl =
-    s"https://uploads.github.com/repos/lihaoyi/Ammonite/releases/" +
+    s"https://uploads.github.com/repos/${ghOrg}/${ghRepo}/releases/" +
       s"$snapshotReleaseId/assets?name=$uploadName"
 
   val res = requests.post(
@@ -35,7 +38,7 @@ def apply(uploadedFile: Path,
     ),
     connectTimeout = 5000, 
     readTimeout = 60000,
-    data = read.bytes(uploadedFile)
+    data = os.read.bytes(uploadedFile)
   ).text
    
 

@@ -53,7 +53,9 @@ object Config{
         Ammonite session. This option mitigates that via class loader isolation.""")
     thin: Flag,
     @arg(doc = "Print this message")
-    help: Flag
+    help: Flag,
+    @arg(name = "version", short = 'v', doc = "Show Ammonite's version")
+    showVersion: Flag
   )
   implicit val coreParser = ParserForClass[Core]
 
@@ -89,7 +91,19 @@ object Config{
       doc =
         "Wrap user code in classes rather than singletons, typically for Java serialization "+
         "friendliness.")
-    classBased: Flag
+    classBased: Flag,
+    @arg(
+      name = "output-directory",
+      doc = """Write byte code of the user code in a directory.
+        The path of that directory can also be accessed later on from the REPL via 'interp.outputDir'.""")
+    outputDirectory: Option[os.Path] = None,
+    @arg(
+      name = "tmp-output-directory",
+      doc = """Write byte code of the user code in a temporary directory, created by Ammonite.
+        You can access get that directory later on via 'interp.outputDir'.
+        That directory is deleted by Ammonite upon exit. Use --output-directory if you'd like
+        the output directory not to be erased.""")
+    tmpOutputDirectory: Flag
   )
   implicit val replParser = ParserForClass[Repl]
 

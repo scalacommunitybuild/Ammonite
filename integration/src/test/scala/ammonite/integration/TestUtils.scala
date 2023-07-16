@@ -1,31 +1,27 @@
 package ammonite.integration
 
-import ammonite.ops._
 import ammonite.util.Util
-import ImplicitWd._
 
 /**
   * Created by haoyi on 6/4/16.
   */
 object TestUtils {
-  val scalaVersion = scala.util.Properties.versionNumberString
+  val scalaVersion = ammonite.compiler.CompilerBuilder.scalaVersion
+  val isScala2 = scalaVersion.startsWith("2.")
   val javaVersion = scala.util.Properties.javaVersion
   val ammVersion = ammonite.Constants.version
-  val executable = {
-    val p = System.getenv("AMMONITE_ASSEMBLY")
+  val ammAssembly = System.getenv("AMMONITE_ASSEMBLY")
+  val executable =
     if (Util.windowsPlatform)
-      Seq(p)
+      Seq(ammAssembly)
     else
-      Seq("bash", p)
-  }
-  val intTestResources = pwd/'integration/'src/'test/'resources
+      Seq("bash", ammAssembly)
+  val intTestResources = os.pwd/'integration/'src/'test/'resources
   val replStandaloneResources = intTestResources/'ammonite/'integration
-  val shellAmmoniteResources = pwd/'shell/'src/'main/'resources/'ammonite/'shell
-  val emptyPrefdef = shellAmmoniteResources/"empty-predef.sc"
-  val exampleBarePredef = shellAmmoniteResources/"example-predef-bare.sc"
+  val shellAmmoniteResources = os.pwd/'shell/'src/'main/'resources/'ammonite/'shell
 
   //we use an empty predef file here to isolate the tests from external forces.
-  def execBase(name: RelPath,
+  def execBase(name: os.RelPath,
                extraAmmArgs: Seq[String],
                home: os.Path,
                args: Seq[String],
@@ -45,16 +41,16 @@ object TestUtils {
       stderr = os.Pipe
     )
   }
-  def exec(name: RelPath, args: String*) =
-    execBase(name, Nil, tmp.dir(), args, thin = true, Nil)
-  def execWithEnv(env: Iterable[(String, String)], name: RelPath, args: String*) =
-    execBase(name, Nil, tmp.dir(), args, thin = true, env)
-  def execNonThin(name: RelPath, args: String*) =
-    execBase(name, Nil, tmp.dir(), args, thin = false, Nil)
-  def execWithHome(home: os.Path, name: RelPath, args: String*) =
+  def exec(name: os.RelPath, args: String*) =
+    execBase(name, Nil, os.temp.dir(), args, thin = true, Nil)
+  def execWithEnv(env: Iterable[(String, String)], name: os.RelPath, args: String*) =
+    execBase(name, Nil, os.temp.dir(), args, thin = true, env)
+  def execNonThin(name: os.RelPath, args: String*) =
+    execBase(name, Nil, os.temp.dir(), args, thin = false, Nil)
+  def execWithHome(home: os.Path, name: os.RelPath, args: String*) =
     execBase(name, Nil, home, args, thin = true, Nil)
-  def execSilent(name: RelPath, args: String*) =
-    execBase(name, Seq("-s"), tmp.dir(), args, thin = true, Nil)
+  def execSilent(name: os.RelPath, args: String*) =
+    execBase(name, Seq("-s"), os.temp.dir(), args, thin = true, Nil)
 
   /**
     *Counts number of non-overlapping occurrences of `subs` in `s`
@@ -65,4 +61,20 @@ object TestUtils {
       case x => substrCount(s, subs, count+1, x + subs.length)
     }
   }
+
+  def containsLines(output: String, expected: String): Boolean =
+    containsLines(output.linesIterator.toList, expected.linesIterator.toList)
+
+  @annotation.tailrec
+  def containsLines(output: List[String], expected: List[String]): Boolean =
+    expected match {
+      case Nil => true
+      case h :: t =>
+        output match {
+          case Nil => false
+          case h0 :: t0 =>
+            val remaining = if (h0.contains(h)) t else expected
+            containsLines(t0, remaining)
+        }
+    }
 }

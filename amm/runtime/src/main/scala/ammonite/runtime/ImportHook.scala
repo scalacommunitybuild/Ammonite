@@ -1,11 +1,12 @@
 package ammonite.runtime
 
-import java.io.{ByteArrayOutputStream, File}
+import java.io.{ByteArrayOutputStream, File => JFile}
 import java.net.URI
 
 import ammonite.interp.api.IvyConstructor
 import ammonite.util.Util.CodeSource
 import ammonite.util._
+import coursier.cputil.ClassPathUtil
 import coursierapi.{Dependency, IvyRepository, MavenRepository, Repository}
 
 import scala.util.{Failure, Success, Try}
@@ -51,8 +52,9 @@ object ImportHook{
     * default this is what is available.
     */
   trait InterpreterInterface {
-    def loadIvy(coordinates: Dependency*): Either[String, Seq[File]]
+    def loadIvy(coordinates: Dependency*): Either[String, Seq[JFile]]
     def watch(p: os.Path): Unit
+    def scalaVersion: String
   }
 
   /**
@@ -79,9 +81,11 @@ object ImportHook{
   def resolveFiles(tree: ImportTree, currentScriptPath: os.Path, extensions: Seq[String])
                   : (Seq[(os.RelPath, Option[String])], Seq[os.Path], Seq[os.Path]) = {
     val relative =
-      tree.prefix
-        .map{case ammonite.util.Util.upPathSegment => os.up; case x => os.rel/x}
-        .reduce(_/_)
+      if (tree.prefix.isEmpty) os.rel
+      else
+        tree.prefix
+          .map{case ammonite.util.Util.upPathSegment => os.up; case x => os.rel/x}
+          .reduce(_/_)
 
     val relativeModules = tree.mappings match{
       case None => Seq(relative -> None)
@@ -171,15 +175,29 @@ object ImportHook{
     def resolve(
       interp: InterpreterInterface,
       signatures: Seq[String]
-    ): Either[String, (Seq[Dependency], Seq[File])] = {
+    ): Either[String, (Seq[Dependency], Seq[JFile])] = {
       val splitted = for (signature <- signatures) yield {
-        signature.split(':') match{
+        val (dottyCompat, coords) =
+          if (signature.endsWith(" compat")) (true, signature.stripSuffix(" compat"))
+          else (false, signature)
+        coords.split(':') match{
           case Array(a, b, c) =>
             Right(Dependency.of(a, b, c))
           case Array(a, "", b, c) =>
-            Right(Dependency.of(a, b + "_" + IvyConstructor.scalaBinaryVersion, c))
+            val sbv =
+              if (dottyCompat && interp.scalaVersion.startsWith("3.")) "2.13"
+              else IvyConstructor.scalaBinaryVersion(interp.scalaVersion)
+            Right(Dependency.of(a, b + "_" + sbv, c))
           case Array(a, "", "", b, c) =>
-            Right(Dependency.of(a, b + "_" + IvyConstructor.scalaFullBinaryVersion, c))
+            val sv =
+              // FIXME We may need to bump that version from time to time, or
+              // to use a different one, depending on the 3.x version.
+              if (dottyCompat && interp.scalaVersion.startsWith("3."))
+                // Should be the 2.13 version we want
+                scala.util.Properties.versionNumberString
+              else
+                interp.scalaVersion
+            Right(Dependency.of(a, b + "_" + sv, c))
           case _ => Left(signature)
         }
       }
@@ -208,19 +226,32 @@ object ImportHook{
                tree: ImportTree,
                interp: InterpreterInterface,
                wrapperPath: Seq[Name]): Either[String, Seq[Result]] = {
-      source.path match{
-        case None => Left("Cannot resolve $cp import in code without source")
-        case Some(currentScriptPath) =>
-          val (relativeModules, files, missing) = resolveFiles(
-            tree, currentScriptPath, Seq(".jar", "")
-          )
-
-          if (missing.nonEmpty)
-            Left("Cannot resolve $cp import: " + missing.mkString(", "))
-          else
-            Right(Seq(Result.ClassPath(None, files, plugin)))
+      val singleElemOpt = (tree.prefix, tree.mappings) match {
+        // for Scala 2
+        case (Seq(elem), None) => Some(elem)
+        // for Scala 3
+        case (Seq(), Some(Seq((elem, None)))) => Some(elem)
+        case _ => None
       }
+      singleElemOpt match {
+        case Some(elem) if elem.contains(JFile.pathSeparator) || elem.contains(JFile.separator) || elem.contains("/") || elem.contains("${") =>
+          val cwd = source.path.fold(os.pwd)(_ / os.up)
+          val cp = ClassPathUtil.classPath(elem).map(os.Path(_, cwd))
+          Right(Seq(Result.ClassPath(None, cp, plugin)))
+        case _ =>
+          source.path match{
+            case None => Left("Cannot resolve $cp import in code without source")
+            case Some(currentScriptPath) =>
+              val (relativeModules, files, missing) = resolveFiles(
+                tree, currentScriptPath, Seq(".jar", "")
+              )
 
+              if (missing.nonEmpty)
+                Left("Cannot resolve $cp import: " + missing.mkString(", "))
+              else
+                Right(Seq(Result.ClassPath(None, files, plugin)))
+          }
+      }
     }
   }
 
@@ -292,7 +323,10 @@ object ImportHook{
                         tree: ImportTree,
                         interp: InterpreterInterface,
                         wrapperPath: Seq[Name]) = {
-      tree.prefix.headOption match {
+      val urlOpt = (tree.prefix.iterator ++ tree.mappings.iterator.flatMap(_.map(_._1).iterator))
+        .toStream
+        .headOption
+      urlOpt match {
         case Some(url) if url.startsWith("ivy:") =>
           val repo = IvyRepository.of(url.drop(4)) // dropping `ivy:` prefix
           Right(Seq(Result.Repo(repo)))

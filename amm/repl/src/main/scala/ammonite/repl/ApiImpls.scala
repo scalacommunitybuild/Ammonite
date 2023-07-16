@@ -1,14 +1,12 @@
 package ammonite.repl
 
-import ammonite.ops.Internals
-import ammonite.repl.api.{Clipboard, FrontEnd, FrontEndAPI, Location, Session, SourceAPI}
-import ammonite.repl.tools.{Desugared, SourceRuntime}
+import ammonite.repl.api.{Clipboard, FrontEnd, FrontEndAPI, Session}
 import ammonite.runtime._
 import ammonite.util.Util._
-import ammonite.util._
-
+import ammonite.util.{Frame => _, _}
 import java.awt.Toolkit
 import java.awt.datatransfer.{DataFlavor, StringSelection}
+import java.io.ByteArrayOutputStream
 import java.util.Locale
 
 import scala.collection.mutable
@@ -78,6 +76,7 @@ trait ReplApiImpl extends FullReplAPI{
     def `type` = colors().`type`()
     def literal = colors().literal()
     def keyword = colors().keyword()
+    def error = colors().error()
     def ident = colors().ident()
   }
 
@@ -87,7 +86,7 @@ trait ReplApiImpl extends FullReplAPI{
       defaultWidth = width,
       colorLiteral = colors().literal(),
       colorApplyPrefix = colors().prefix(),
-      additionalHandlers = PPrints.replPPrintHandlers
+      additionalHandlers = PPrints.replPPrintHandlers(width)
     )
   )
 
@@ -130,84 +129,23 @@ object ClipboardImpl extends Clipboard {
       case _ => ""
     }
 
-  override def write(data: Internals.Writable): Unit = {
+  override def write(data: geny.Writable): Unit = {
+    val out = new ByteArrayOutputStream()
+    data.writeBytesTo(out)
     val newContents = new StringSelection(
-      data.writeableData.map(new String(_)).mkString
+      new String(out.toByteArray)
     )
     systemClipboard.setContents(newContents, newContents)
   }
 }
 
-trait SourceAPIImpl extends SourceAPI {
-
-  def loadObjectMemberInfo(symbolOwnerCls: Class[_],
-                           value: Option[Any],
-                           memberName: String,
-                           returnType: Class[_],
-                           argTypes: Class[_]*): Either[String, Location] =
-    SourceRuntime.loadObjectMemberInfo(
-      symbolOwnerCls,
-      value,
-      memberName,
-      returnType,
-      argTypes: _*
-    )
-
-  def loadObjectInfo(value: Any): Either[String, Location] =
-    SourceRuntime.loadObjectInfo(value)
-
-  def browseObjectMember(symbolOwnerCls: Class[_],
-                         value: Option[Any],
-                         memberName: String,
-                         pprinter: pprint.PPrinter,
-                         colors: CodeColors,
-                         command: Int => Seq[String],
-                         returnType: Class[_],
-                         argTypes: Class[_]*): Any =
-    SourceRuntime.browseObjectMember(
-      symbolOwnerCls,
-      value,
-      memberName,
-      pprinter,
-      colors,
-      n => command(n),
-      returnType,
-      argTypes: _*
-    )
-
-  def browseObject(value: Any,
-                   pprinter: pprint.PPrinter,
-                   colors: CodeColors,
-                   command: Int => Seq[String]): Any =
-    SourceRuntime.browseObject(
-      value,
-      pprinter,
-      colors,
-      n => command(n)
-    )
-
-  def desugarImpl(s: String)(implicit colors: ammonite.util.CodeColors): Desugared = {
-
-    new Desugared(
-      ammonite.repl.Highlighter.defaultHighlight(
-        s.toVector,
-        colors.comment,
-        colors.`type`,
-        colors.literal,
-        colors.keyword,
-        fansi.Attr.Reset
-      ).mkString
-    )
-  }
-
-}
-
 trait FrontEndAPIImpl extends FrontEndAPI {
+  protected def parser: ammonite.compiler.iface.Parser
   def apply(name: String): FrontEnd =
     name.toLowerCase(Locale.ROOT) match {
-      case "ammonite" => AmmoniteFrontEnd()
-      case "windows" => FrontEnds.JLineWindows
-      case "unix" => FrontEnds.JLineUnix
+      case "ammonite" => AmmoniteFrontEnd(parser)
+      case "windows" => new FrontEnds.JLineWindows(parser)
+      case "unix" => new FrontEnds.JLineUnix(parser)
       case _ => throw new NoSuchElementException(s"Front-end $name")
     }
 }

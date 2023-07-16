@@ -1,8 +1,6 @@
 package ammonite.integration
 
 import ammonite.integration.TestUtils._
-import ammonite.ops.ImplicitWd._
-import ammonite.ops._
 import ammonite.util.Util
 import utest._
 
@@ -13,51 +11,79 @@ import utest._
  */
 object ErrorTruncationTests extends TestSuite{
 
-  def checkErrorMessage(file: RelPath, expected: String): Unit = {
+  def checkErrorMessage(file: os.RelPath, expected: String): Unit = {
     val e = fansi.Str(
       Util.normalizeNewlines(
         intercept[os.SubprocessException]{ exec(file) }
           .result
           .err
-          .string
+          .text()
       )
     ).plainText
     //This string gets included on windows due to environment variable set additionally
 
-    assert(fansi.Str(e).plainText.contains(expected))
+    assert(TestUtils.containsLines(fansi.Str(e).plainText, expected))
   }
   val tests = Tests {
     println("ErrorTruncationTests")
-    test("compileError") - checkErrorMessage(
-      file = 'errorTruncation/"compileError.sc",
-      expected = Util.normalizeNewlines(
-        s"""compileError.sc:1: not found: value doesntexist
-          |val res = doesntexist
-          |          ^
-          |Compilation Failed
-          |""".stripMargin
+    test("compileError") {
+      val path = os.rel/'errorTruncation/"compileError.sc"
+      val sp = " "
+      checkErrorMessage(
+        file = path,
+        expected = Util.normalizeNewlines(
+          if (isScala2)
+            s"""compileError.sc:1: not found: value doesntexist
+               |val res = doesntexist
+               |          ^
+               |Compilation Failed
+               |""".stripMargin
+          else
+            s"""-- [E006] Not Found Error: ${replStandaloneResources / path}:1:10$sp
+               |1 |val res = doesntexist
+               |  |          ^^^^^^^^^^^
+               |  |          Not found: doesntexist
+               |Compilation Failed""".stripMargin
+        )
       )
-    )
-    test("multiExpressionError") - checkErrorMessage(
-      file = 'errorTruncation/"compileErrorMultiExpr.sc",
-      expected = Util.normalizeNewlines(
-        s"""compileErrorMultiExpr.sc:11: not found: value doesntexist
-          |val res_4 = doesntexist
-          |            ^
-          |Compilation Failed
-          |""".stripMargin
+    }
+    test("multiExpressionError") {
+      val path = os.rel / 'errorTruncation/"compileErrorMultiExpr.sc"
+      val sp = " "
+      checkErrorMessage(
+        file = path,
+        expected = Util.normalizeNewlines(
+          if (isScala2)
+            s"""compileErrorMultiExpr.sc:11: not found: value doesntexist
+               |val res_4 = doesntexist
+               |            ^
+               |Compilation Failed
+               |""".stripMargin
+          else
+            s"""-- [E006] Not Found Error: ${replStandaloneResources / path}:11:12$sp
+               |11 |val res_4 = doesntexist
+               |   |            ^^^^^^^^^^^
+               |   |            Not found: doesntexist
+               |Compilation Failed""".stripMargin
+        )
       )
-    )
+    }
 
     test("parseError"){
       if(!Util.windowsPlatform){
         checkErrorMessage(
-          file = 'errorTruncation/"parseError.sc",
+          file = os.rel/'errorTruncation/"parseError.sc",
           expected = Util.normalizeNewlines(
-            """parseError.sc:1:1 expected end-of-input
-              |}
-              |^
-              |""".stripMargin
+            if (isScala2)
+              """parseError.sc:1:1 expected end-of-input
+                |}
+                |^
+                |""".stripMargin
+            else
+              """-- [E040] Syntax Error: <splitter>:1:0 -----------------------------------------
+                |1 |}
+                |  |^
+                |  |eof expected, but '}' found""".stripMargin
           )
         )
       }
@@ -67,9 +93,9 @@ object ErrorTruncationTests extends TestSuite{
       "ammonite.$file.integration.src.test.resources.ammonite.integration.errorTruncation"
 
     test("runtimeError") - checkErrorMessage(
-      file = 'errorTruncation/"runtimeError.sc",
+      file = os.rel/'errorTruncation/"runtimeError.sc",
       expected = Util.normalizeNewlines(
-        if (scala.util.Properties.versionNumberString.startsWith("2.12"))
+        if (scalaVersion.startsWith("2.12"))
           s"""java.lang.ArithmeticException: / by zero
              |  $runtimeErrorResourcePackage.runtimeError$$.<init>(runtimeError.sc:1)
              |  $runtimeErrorResourcePackage.runtimeError$$.<clinit>(runtimeError.sc)

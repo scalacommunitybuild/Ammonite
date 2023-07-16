@@ -2,12 +2,13 @@ package ammonite.repl
 
 import java.io.{InputStream, InputStreamReader, OutputStream}
 
-import ammonite.repl.api.{FrontEnd, FrontEndAPI, History, ReplLoad, SourceAPI}
+import ammonite.repl.api.{FrontEnd, History, ReplLoad}
 import ammonite.runtime._
 import ammonite.terminal.Filter
 import ammonite.util.Util.{newLine, normalizeNewlines}
 import ammonite.util._
-import ammonite.interp.{CodeWrapper, Interpreter, Parsers, Preprocessor}
+import ammonite.compiler.iface.{CodeWrapper, CompilerBuilder, Parser}
+import ammonite.interp.Interpreter
 import coursierapi.Dependency
 
 import scala.annotation.tailrec
@@ -27,6 +28,8 @@ class Repl(input: InputStream,
            scriptCodeWrapper: CodeWrapper,
            alreadyLoadedDependencies: Seq[Dependency],
            importHooks: Map[Seq[String], ImportHook],
+           compilerBuilder: CompilerBuilder,
+           parser: Parser,
            initialClassLoader: ClassLoader =
              classOf[ammonite.repl.api.ReplAPI].getClassLoader,
            classPathWhitelist: Set[Seq[String]]) { repl =>
@@ -35,9 +38,9 @@ class Repl(input: InputStream,
 
   val frontEnd = Ref[FrontEnd](
     if (scala.util.Properties.isWin)
-      ammonite.repl.FrontEnds.JLineWindows
+      new ammonite.repl.FrontEnds.JLineWindows(parser)
     else
-      AmmoniteFrontEnd(Filter.empty)
+      AmmoniteFrontEnd(parser, Filter.empty)
   )
 
   var lastException: Throwable = null
@@ -70,20 +73,25 @@ class Repl(input: InputStream,
 
   def usedEarlierDefinitions = frames().head.usedEarlierDefinitions
 
-  val interp = new Interpreter(
-    printer,
-    storage,
-    wd,
-    colors,
+  val interpParams = Interpreter.Parameters(
+    printer = printer,
+    storage = storage,
+    wd = wd,
+    colors = colors,
     verboseOutput = true,
+    initialClassLoader = initialClassLoader,
+    importHooks = importHooks,
+    classPathWhitelist = classPathWhitelist,
+    alreadyLoadedDependencies = alreadyLoadedDependencies
+  )
+  val interp = new Interpreter(
+    compilerBuilder,
+    () => parser,
     getFrame = () => frames().head,
     createFrame = () => { val f = sess0.childFrame(frames().head); frames() = f :: frames(); f },
-    initialClassLoader = initialClassLoader,
     replCodeWrapper = replCodeWrapper,
     scriptCodeWrapper = scriptCodeWrapper,
-    alreadyLoadedDependencies = alreadyLoadedDependencies,
-    importHooks,
-    classPathWhitelist = classPathWhitelist
+    parameters = interpParams
   )
 
   val bridges = Seq(
@@ -102,8 +110,6 @@ class Repl(input: InputStream,
         def fullHistory = storage.fullHistory()
         def history = repl.history
         def newCompiler() = interp.compilerManager.init(force = true)
-        def compiler = interp.compilerManager.compiler.compiler
-        def interactiveCompiler = interp.compilerManager.pressy.compiler
         def fullImports = repl.fullImports
         def imports = repl.imports
         def usedEarlierDefinitions = repl.usedEarlierDefinitions
@@ -125,17 +131,16 @@ class Repl(input: InputStream,
             apply(normalizeNewlines(os.read(file)))
           }
         }
+
+        def _compilerManager = interp.compilerManager
       }
-    ),
-    (
-      "ammonite.repl.api.SourceBridge",
-      "source",
-      new SourceAPIImpl {}
     ),
     (
       "ammonite.repl.api.FrontEndBridge",
       "frontEnd",
-      new FrontEndAPIImpl {}
+      new FrontEndAPIImpl {
+        def parser = repl.parser
+      }
     )
   )
 
@@ -154,7 +159,7 @@ class Repl(input: InputStream,
     // running the user code directly. Could be made longer to better warm more
     // code paths, but then the fixed overhead gets larger so not really worth it
     val code = s"""val array = Seq.tabulate(10)(_*2).toArray.max"""
-    val stmts = Parsers.split(code).get.get.value
+    val stmts = parser.split(code).get.toOption.get
     interp.processLine(code, stmts, 9999999, silent = true, () => () /*donothing*/)
   }
 
@@ -172,7 +177,9 @@ class Repl(input: InputStream,
 
       case ex => Res.Exception(ex, "")
     }
-
+    // workaround to wildcard imports breaking code completion, see
+    // https://github.com/com-lihaoyi/Ammonite/issues/1009
+    importsForCompletion = Imports(fullImports.value.filter(_.fromName.raw != "package"))
     _ <- Signaller("INT") {
       // Put a fake `ThreadDeath` error in `lastException`, because `Thread#stop`
       // raises an error with the stack trace of *this interrupt thread*, rather
@@ -187,7 +194,7 @@ class Repl(input: InputStream,
       output,
       colors().prompt()(prompt()).render,
       colors(),
-      interp.compilerManager.complete(_, fullImports.toString, _),
+      interp.compilerManager.complete(_, importsForCompletion.toString, _),
       storage.fullHistory(),
       addHistory = (code) => if (code != "") {
         storage.fullHistory() = storage.fullHistory() :+ code
@@ -203,7 +210,9 @@ class Repl(input: InputStream,
 
 
   def run(): Any = {
-    welcomeBanner.foreach(printer.outStream.println)
+    welcomeBanner
+      .map(_.replace("%SCALA_VERSION%", compilerBuilder.scalaVersion))
+      .foreach(printer.outStream.println)
     @tailrec def loop(): Any = {
       val actionResult = action()
       Repl.handleOutput(interp, actionResult)

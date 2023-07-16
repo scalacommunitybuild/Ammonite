@@ -1,18 +1,17 @@
 package ammonite.unit
 
 
-import ammonite.repl.SourceAPIImpl
-import ammonite.repl.api.{Location, SourceBridge}
 import utest._
-import ammonite.repl.tools.source.load
+import ammonite.compiler.tools.source.load
 import ammonite.util.Util
+import ammonite.util.Util.Location
 
 import java.io.InputStream
 object SourceTests extends TestSuite{
-  val tests = Tests{
-
-    if (SourceBridge.value0 == null)
-      SourceBridge.value0 = new SourceAPIImpl {}
+  val tests =
+    if (ammonite.compiler.CompilerBuilder.scalaVersion.startsWith("2.")) scala2Tests
+    else scala3Tests
+  def scala2Tests = Tests{
 
     def check(loaded: Location, expectedFileName: String, expected: String, slop: Int = 10) = {
 
@@ -132,5 +131,9 @@ object SourceTests extends TestSuite{
         )
       }
     }
+  }
+  def scala3Tests = Tests {
+    // 'source' not supported for now
+    test("disabled") { "disabled for Scala 3" }
   }
 }

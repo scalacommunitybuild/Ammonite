@@ -17,6 +17,7 @@ object Scripts {
                 scriptArgs: Seq[String] = Nil) = {
     interp.watch(path)
     val (pkg, wrapper) = Util.pathToPackageWrapper(Seq(), path relativeTo wd)
+    val genRoutesCode = "mainargs.ParserForMethods[$routesOuter.type]($routesOuter)"
 
     for{
       scriptTxt <- try Res.Success(Util.normalizeNewlines(os.read(path))) catch{
@@ -37,7 +38,7 @@ object Scripts {
           |val $$routesOuter = this
           |object $$routes
           |extends scala.Function0[mainargs.ParserForMethods[$$routesOuter.type]]{
-          |  def apply() = mainargs.ParserForMethods[$$routesOuter.type]($$routesOuter)
+          |  def apply() = $genRoutesCode
           |}
           """.stripMargin
         ),
@@ -50,8 +51,8 @@ object Scripts {
       }
 
       scriptMains = interp.scriptCodeWrapper match{
-        case ammonite.interp.CodeWrapper =>
-          Some(
+        case ammonite.compiler.DefaultCodeWrapper =>
+          Option(
             interp
               .evalClassloader
               .loadClass(routeClsName + "$$routes$")
@@ -61,14 +62,14 @@ object Scripts {
               .apply()
           )
 
-        case ammonite.interp.CodeClassWrapper =>
+        case ammonite.compiler.CodeClassWrapper =>
           val outer = interp
             .evalClassloader
             .loadClass(routeClsName)
             .getMethod("instance")
             .invoke(null)
 
-          Some(
+          Option(
             outer.getClass.getMethod("$routes").invoke(outer)
               .asInstanceOf[() => mainargs.ParserForMethods[Any]]
               .apply()
@@ -77,9 +78,9 @@ object Scripts {
       }
 
       res <- Util.withContextClassloader(interp.evalClassloader){
-        scriptMains match {
+        scriptMains.filter(!_.mains.value.isEmpty) match {
           // If there are no @main methods, there's nothing to do
-          case Some(parser) if parser.mains.value.isEmpty =>
+          case None =>
             if (scriptArgs.isEmpty) Res.Success(())
             else Res.Failure(
               "Script " + path.last +

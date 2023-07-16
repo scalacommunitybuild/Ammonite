@@ -9,25 +9,42 @@ object FailureTests extends TestSuite{
     println("FailureTests")
     val check = new DualTestRepl()
     test("compileFailure"){
-      check.session("""
-        @ doesnt_exist
-        error: not found: value doesnt_exist
+      if (check.scala2)
+        check.session(s"""
+          @ doesnt_exist
+          error: not found: value doesnt_exist
 
-        @ java
-        error: java is not a value
+          @ java
+          error: java is not a value
 
-        @ 1 + vale
-        error: not found: value vale
-        val res0 = 1 + vale
-                       ^
-        Compilation Failed
+          @ 1 + vale
+          error: not found: value vale
+          val res0 = 1 + vale
+                         ^
+          Compilation Failed
 
-        @ val x = 1 + vale
-        error: not found: value vale
-        val x = 1 + vale
-                    ^
-        Compilation Failed
-      """)
+          @ val x = 1 + vale
+          error: not found: value vale
+          val x = 1 + vale
+                      ^
+          Compilation Failed
+        """)
+      else
+        check.session(s"""
+          @ doesnt_exist
+          error: Not found: doesnt_exist
+
+          @ java
+          error: java is not a value
+
+          @ 1 + vale
+          error: Not found: vale
+          Compilation Failed
+
+          @ val x = 1 + vale
+          error: Not found: vale
+          Compilation Failed
+        """)
     }
     test("compilerCrash"){
       // Make sure compiler crashes provide the appropriate error
@@ -59,6 +76,37 @@ object FailureTests extends TestSuite{
         !x.contains("evaluatorRunPrinter") &&
         !x.contains("Something unexpected went wrong =(")
       )
+    }
+
+    test("lineNumbersInStackTrace1") {
+      if (check.scala2) {
+        check.fail(
+          """
+            |
+            |
+            | 1 / 0
+            |""".stripMargin, x =>
+            x.contains("/ by zero") &&
+            x.contains("cmd0.sc:4") // check that the line number is correct
+
+        )
+      }
+    }
+
+    test("lineNumbersInStackTrace2") {
+      if (check.scala2) {
+        check.fail(
+        """
+          |{
+          |
+          | // block command
+          | 1 / 0
+          |}
+          |""".stripMargin, x =>
+          x.contains("/ by zero") &&
+          x.contains("cmd0.sc:5") // check that the line number is correct
+        )
+      }
     }
   }
 }

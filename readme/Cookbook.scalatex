@@ -9,8 +9,7 @@
     The Ammonite Scala REPL and Scripts are meant to be extended: you can load
     in arbitrary Java/Scala modules from the internet via
     @sect.ref{import $ivy}. Using this third-party code, you
-    extend the REPL to do anything you wish to do, and tools like
-    @sect.ref{Ammonite-Shell} are simply modules like any other. Simple
+    extend the REPL to do anything you wish to do. Simple
     install Java, @sect.ref("Ammonite-REPL", "download Ammonite") onto any
     Linux/OSX machine, and try out one of these fun snippets! They work
     directly in the @sect.ref{Ammonite-REPL}, or you can save them to
@@ -37,9 +36,6 @@
     @hl.scala
       Welcome to the Ammonite Repl
 
-      @@ import ammonite.ops._
-      import ammonite.ops._
-
       @@ val resp = requests.get("https://api.github.com/repos/scala/scala")
 
       @@ val parsed = upickle.json.read(resp.text()).asInstanceOf[upickle.Js.Obj]
@@ -55,9 +51,9 @@
                 ("login", Str("scala")),
       ...
 
-      @@ for((k, v) <- parsed.value) write(pwd/'target/'temp/k, upickle.json.write(v))
+      @@ for((k, v) <- parsed.value) os.write(os.pwd/'target/'temp/k, upickle.json.write(v))
 
-      @@ ls! pwd/'target/'temp
+      @@ os.list(os.pwd/'target/'temp)
       res6: LsSeq = LsSeq(
         /Users/haoyi/Dropbox (Personal)/Workspace/Ammonite/target/temp/archive_url,
         /Users/haoyi/Dropbox (Personal)/Workspace/Ammonite/target/temp/assignees_url,
@@ -66,7 +62,7 @@
       ...
 
     @p
-      In this example, we use the @lnk("Requests-Scala", "https://github.com/lihaoyi/requests-scala") library to download a URL, and we use @lnk("uPickle", "http://lihaoyi.github.io/upickle-pprint/upickle/") and @sect.ref{Ammonite-Ops} to parse the JSON and write it into files. uPickle and Ammonite-Ops are bundled with the Ammonite REPL and are used internally.
+      In this example, we use the @lnk("Requests-Scala", "https://github.com/lihaoyi/requests-scala") library to download a URL, and we use @lnk("uPickle", "http://lihaoyi.github.io/upickle-pprint/upickle/") and OS-Lib to parse the JSON and write it into files. uPickle and Ammonite-Ops are bundled with the Ammonite REPL and are used internally.
     @p
       This is a small example, but it illustrates the potential: if you find yourself needing to scrape some website or bulk-download large quantities of data from some website's HTTP/JSON API, you can start doing so within a matter of seconds using Ammonite. The results are given to you in nicely structured data, and you can deal with them using any Java or Scala libraries or tools you are used to rather than being forced to munge around in Bash. Sometimes, you may find that you need to get data from somewhere without a nice JSON API, which means you'd need to fall back to @sect.ref{Scraping HTML}...
 
@@ -127,12 +123,12 @@
     @p
       This can be run inside the Ammonite REPL without installing anything, and will show the following window with a single button:
 
-    @img(src:="Swing1.png", marginLeft.auto, marginRight.auto)
+    @img(src:="Swing1.png", marginLeft.auto, marginRight.auto, loadingLazy)
 
     @p
       When clicked, it changes text:
 
-    @img(src:="Swing2.png", marginLeft.auto, marginRight.auto)
+    @img(src:="Swing2.png", marginLeft.auto, marginRight.auto, loadingLazy)
 
     @p
       Although this is just a small demo, you can use Ammonite yourself to experiment with GUI programming without needing to go through the hassle of setting up an environment and project and all that rigmarole. Just run the code right in the console! You can even interact with the GUI live in the console, e.g. running this snippet of code to add another action listener to keep count of how many times you clicked the button
@@ -151,7 +147,7 @@
     @p
       Which immediately becomes visible in the title of the window:
 
-    @img(src:="Swing3.png", marginLeft.auto, marginRight.auto)
+    @img(src:="Swing3.png", marginLeft.auto, marginRight.auto, loadingLazy)
 
     @p
       Even while you're clicking on the button, you can still access @code{count} in the console:
@@ -160,6 +156,71 @@
       res12: Int = 6
     @p
       This is a level of live interactivity which is traditionally hard to come by in the world of desktop GUI applications, but with the Ammonite REPL, it's totally seamless
+    @p 
+      You can also import JavaFX applications, using ScalaFX.  This is easiest if you create a file `jfx.sc` to contain the relevant imports:
+
+    @hl.scala
+      @@ {
+        import $ivy.{
+          `org.scalafx::scalafx:16.0.0-R24`
+        }
+
+        lazy val osName = System.getProperty("os.name") match {
+          case n if n.startsWith("Linux") => "linux"
+          case n if n.startsWith("Mac") => "mac"
+          case n if n.startsWith("Windows") => "win"
+          case _ => throw new Exception("Unknown platform!")
+        }
+
+        val javaFXModules = Seq("base", "controls", "fxml", "graphics", "media", "swing", "web")
+        javaFXModules.map(m =>
+          interp.load.ivy(coursierapi.Dependency.of("org.openjfx", s"javafx-$m", "15.0.1").withClassifier(osName))
+        )
+      }
+   @p 
+      And then you can use `import $file.jfx` with the ScalaFX DSL.
+
+    @hl.scala
+      @@ {
+        import $file.jfx
+
+        import scalafx.application.JFXApp3
+        import scalafx.application.JFXApp3.PrimaryStage
+        import scalafx.geometry.Insets
+        import scalafx.scene.Scene
+        import scalafx.scene.layout.HBox
+        import scalafx.scene.paint.Color._
+        import scalafx.scene.paint._
+        import scalafx.scene.text.Text
+
+        import scala.language.implicitConversions
+
+        @@main
+        def main() {
+          JFXApp3Demo.main(Array())
+        }
+
+        object JFXApp3Demo extends JFXApp3 {
+          override def start(): Unit = {
+            stage = new PrimaryStage {
+              title = "ScalaFX Hello World!"
+              scene = new Scene {
+                fill = Color.rgb(38, 38, 38)
+                content = new HBox {
+                  padding = Insets(50, 80, 50, 80)
+                  children = Seq(
+                    new Text {
+                      text = "Hello World!"
+                      style = "-fx-font: normal bold 100pt sans-serif"
+                      fill = new LinearGradient(endX = 0, stops = Stops(Red, DarkRed))
+                    }
+                  )
+                }
+              }
+            }
+          }
+        }              
+      }
 
   @sect{Office Automation}
     @p
@@ -168,13 +229,12 @@
     @hl.scala
       @@ import $ivy.`org.apache.poi:poi-ooxml:3.13`
 
-      @@ import ammonite.ops._                  // Prepare to deal with some files
       @@ import org.apache.poi.xwpf.usermodel._ // Bring Ms-Word APIs into scope
       @@ import collection.JavaConversions._    // Make use of Java collections easier
 
       @@ val path = pwd/'amm/'src/'test/'resources/'testdata/"Resume.docx"
 
-      @@ val docx = new XWPFDocument(new java.io.ByteArrayInputStream(read.bytes(path)))
+      @@ val docx = new XWPFDocument(new java.io.ByteArrayInputStream(os.read.bytes(path)))
 
       @@ docx.get<tab>
       getAllEmbedds                            getParagraphArray

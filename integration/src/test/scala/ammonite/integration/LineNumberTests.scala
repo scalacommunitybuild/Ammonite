@@ -1,5 +1,4 @@
 package ammonite.integration
-import ammonite.ops._
 import ammonite.util.Util
 import utest._
 import TestUtils._
@@ -11,22 +10,33 @@ import TestUtils._
 object LineNumberTests extends TestSuite{
   val tests = this{
 
-    def checkErrorMessage(file: RelPath, expected: String): Unit = {
+    def checkErrorMessage(file: os.RelPath, expected: String): Unit = {
       val e = intercept[os.SubprocessException]{
         exec(file)
-      }.result.err.string
-      assert(e.contains(expected))
+      }.result.err.text()
+      assert(TestUtils.containsLines(e, expected))
     }
 
 
-    test("compilationErrorInSecondBlock") - checkErrorMessage(
-      file = 'lineNumbers/"compilationErrorInSecondBlock.sc",
-      expected = Util.normalizeNewlines(
-        """compilationErrorInSecondBlock.sc:14: not found: value printnl
-          |val res_0 = printnl("OK")
-          |            ^""".stripMargin
+    test("compilationErrorInSecondBlock") {
+      val path = os.rel/'lineNumbers/"compilationErrorInSecondBlock.sc"
+      val sp = " "
+      checkErrorMessage(
+        file = path,
+        expected = Util.normalizeNewlines(
+          if (isScala2)
+            """compilationErrorInSecondBlock.sc:14: not found: value printnl
+              |val res_0 = printnl("OK")
+              |            ^""".stripMargin
+          else
+            s"""-- [E006] Not Found Error: ${replStandaloneResources / path}:1:12$sp
+               |1 |val res_0 = printnl("OK")
+               |  |            ^^^^^^^
+               |  |            Not found: printnl
+               |Compilation Failed""".stripMargin
+        )
       )
-    )
+    }
 
   }
 }

@@ -11,7 +11,7 @@ import utest._
  */
 object MainTests extends TestSuite{
   def exec(p: String, args: String*) =
-    new InProcessMainMethodRunner(os.rel / 'mains / p, Nil, args)
+    new InProcessMainMethodRunner(InProcessMainMethodRunner.base / 'mains / p, Nil, args)
 
   def stripInvisibleMargin(s: String): String = {
     val lines = Predef.augmentString(s).lines.toArray
@@ -19,7 +19,7 @@ object MainTests extends TestSuite{
     lines.map(_.drop(leftMargin)).mkString(Util.newLine)
   }
 
-  val tests = Tests {
+  def tests = Tests {
     println("Running MainTests")
 
     test("hello"){
@@ -40,7 +40,7 @@ object MainTests extends TestSuite{
     // logic revolves around handling arguments. Make sure this fails properly
     test("badAmmoniteFlag"){
       val evaled = new InProcessMainMethodRunner(
-        os.rel / 'mains/"Hello.sc",
+        InProcessMainMethodRunner.base / 'mains/"Hello.sc",
         List("--doesnt-exist"),
         Nil
       )
@@ -98,13 +98,53 @@ object MainTests extends TestSuite{
           assert(out.contains(expected.trim))
         }
         test("emptyArg"){
-          val evaled = exec("ArgList.sc", "")
-          assert(evaled.success)
+          val isScala2 = ammonite.compiler.CompilerBuilder.scalaVersion.startsWith("2.")
+          if (isScala2) {
+            val evaled = exec("ArgList.sc", "")
+            assert(evaled.success)
+          } else {
+            "Disabled in Scala 3"
+          }
         }
       }
     }
 
     test("args"){
+      test("version"){
+        // Unlike other flags, activating the version flag (if it ever appears
+        // as one of the flags passed in) should show Ammonite's version and
+        // then quickly exit afterwards.
+        def execRawArgs(args: String*) =
+          new InProcessMainMethodRunnerRawArgs(args.toList)
+
+        val expectedVersionOutput =
+          s"Ammonite REPL & Script-Runner, ${ammonite.Constants.version}"
+
+        test("longVersionFlag"){
+          val evaled = execRawArgs("--version")
+          assert(evaled.success)
+          assert(evaled.out.trim == expectedVersionOutput)
+        }
+
+        test("shortVersionFlag"){
+          val evaled = execRawArgs("-v")
+          assert(evaled.success)
+          assert(evaled.out.trim == expectedVersionOutput)
+        }
+
+        test("longVersionFlagWithOtherArgs"){
+          val evaled = execRawArgs("--version", "-i", "-w")
+          assert(evaled.success)
+          assert(evaled.out.trim == expectedVersionOutput)
+        }
+
+        test("shortVersionFlagWithOtherArgs"){
+          val evaled = execRawArgs("-v", "-i", "-w")
+          assert(evaled.success)
+          assert(evaled.out.trim == expectedVersionOutput)
+        }
+      }
+
       test("full"){
         val evaled = exec("Args.sc", "-i", "3", "-s", "Moo", (os.pwd/'omg/'moo).toString)
         assert(evaled.success)

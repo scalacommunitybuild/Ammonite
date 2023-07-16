@@ -1,8 +1,8 @@
 package ammonite.session
 
 import ammonite.TestUtils._
-import ammonite.DualTestRepl
-import ammonite.util.{Res, Util}
+import ammonite.{DualTestRepl, TestRepl}
+import ammonite.util.Res
 import utest._
 
 
@@ -30,18 +30,19 @@ object AdvancedTests extends TestSuite{
         defined class Foo
 
         @ Foo(1, "", Nil)
-        res2: Foo = Foo(1, "", List())
+        res2: Foo = ${Print.Foo(i = "1", s0 = "\"\"", s1 = "List()")}
 
         @ Foo(
         @   1234567,
         @   "I am a cow, hear me moo",
         @   Seq("I weigh twice as much as you", "and I look good on the barbecue")
         @ )
-        res3: Foo = Foo(
-          1234567,
-          "I am a cow, hear me moo",
-          List("I weigh twice as much as you", "and I look good on the barbecue")
-        )
+        res3: Foo = ${Print.Foo(
+          i = 1234567,
+          s0 = "\"I am a cow, hear me moo\"",
+          s1 = "List(\"I weigh twice as much as you\", \"and I look good on the barbecue\")",
+          indent = "        "
+        )}
       """)
     }
 
@@ -81,74 +82,98 @@ object AdvancedTests extends TestSuite{
     test("predefSettings"){
       val check2 = new DualTestRepl{
         override def predef = (
-          """
-          interp.configureCompiler(_.settings.Xexperimental.value = true)
-          """,
+          if (scala2)
+            """
+            interp.configureCompiler(_.settings.Xexperimental.value = true)
+            """
+          else
+            """
+            interp.preConfigureCompiler(ctx => ctx.setSetting(ctx.settings.showPlugins, true))
+            """,
           None
         )
       }
-      check2.session("""
-        @ repl.compiler.settings.Xexperimental.value
+      val getSetting =
+        if (check2.scala2) "repl.compiler.settings.Xexperimental.value"
+        else "repl.initialContext.settings.showPlugins.value(using repl.initialContext)"
+      check2.session(s"""
+        @ $getSetting
         res0: Boolean = true
       """)
 
     }
     test("macros"){
-      check.session("""
-        @ import language.experimental.macros
+      if (check.scala2)
+        check.session("""
+          @ import language.experimental.macros
 
-        @ import reflect.macros.Context
+          @ import reflect.macros.Context
 
-        @ object Macro {
-        @   def impl(c: Context): c.Expr[String] = {
-        @    import c.universe._
-        @    c.Expr[String](Literal(Constant("Hello!")))
-        @   }
-        @ }
-        defined object Macro
+          @ object Macro {
+          @   def impl(c: Context): c.Expr[String] = {
+          @    import c.universe._
+          @    c.Expr[String](Literal(Constant("Hello!")))
+          @   }
+          @ }
+          defined object Macro
 
-        @ def m: String = macro Macro.impl
-        defined function m
+          @ def m: String = macro Macro.impl
+          defined function m
 
-        @ m
-        res4: String = "Hello!"
-      """)
+          @ m
+          res4: String = "Hello!"
+        """)
+      else
+        check.session("""
+          @ inline def assert1(cond: Boolean, msg: => String) =
+          @   if !cond then
+          @     throw new Exception(msg)
+          @ //
+          defined function assert1
+
+          @ assert1(true, "error1"); val n = 2
+          n: Int = 2
+
+          @ assert1(false, "error1"); val m = 3
+          error: java.lang.Exception: error1
+
+          @ val ammStackTrace = {
+          @   scala.util.Try(assert1(false, "error1"))
+          @     .toEither
+          @     .left
+          @     .get
+          @     .getStackTrace
+          @     .map(_.toString)
+          @     .filter(_.startsWith("ammonite.$sess."))
+          @ }
+
+          @ assert(ammStackTrace.nonEmpty)
+
+          @ assert(ammStackTrace.forall(_.contains("cmd3.sc")))
+        """)
     }
     test("typeScope"){
-      // Fancy type-printing isn't implemented at all in 2.10.x
-      check.session("""
+      // TPrint issue in Scala 3?
+      val cmBufferType =
+        if (check.scala2) "collection.mutable.Buffer" else "Buffer"
+      val mBufferType =
+        if (check.scala2) "mutable.Buffer" else "Buffer"
+      check.session(s"""
         @ collection.mutable.Buffer(1)
-        res0: collection.mutable.Buffer[Int] = ArrayBuffer(1)
+        res0: $cmBufferType[Int] = ArrayBuffer(1)
 
         @ import collection.mutable
 
         @ collection.mutable.Buffer(1)
-        res2: mutable.Buffer[Int] = ArrayBuffer(1)
+        res2: $mBufferType[Int] = ArrayBuffer(1)
 
         @ mutable.Buffer(1)
-        res3: mutable.Buffer[Int] = ArrayBuffer(1)
+        res3: $mBufferType[Int] = ArrayBuffer(1)
 
         @ import collection.mutable.Buffer
 
         @ mutable.Buffer(1)
         res5: Buffer[Int] = ArrayBuffer(1)
-      """)
-    }
-    test("customTypePrinter"){
-      check.session("""
-        @ Array(1)
-        res0: Array[Int] = Array(1)
-
-        @ import pprint.TPrint
-
-        @ implicit def ArrayTPrint[T: TPrint]: TPrint[Array[T]] = TPrint.lambda( c =>
-        @   implicitly[TPrint[T]].render(c) +
-        @   " " +
-        @   c.typeColor("Array").render
-        @ )
-
-        @ Array(1)
-        res3: Int Array = Array(1)
       """)
     }
     test("trappedType"){
@@ -242,7 +267,7 @@ object AdvancedTests extends TestSuite{
       """)
     }
     test("private"){
-      test("vals") - check.session("""
+      test("vals") - check.session(s"""
         @ private val x = 1; val y = x + 1
         y: Int = 2
 
@@ -250,7 +275,7 @@ object AdvancedTests extends TestSuite{
         res1: Int = 2
 
         @ x
-        error: not found: value x
+        error: ${check.notFound("x")}
 
         @ {
         @ private[this] val a = 3
@@ -258,7 +283,7 @@ object AdvancedTests extends TestSuite{
         @ }
 
         @ a
-        error: not found: value a
+        error: ${check.notFound("a")}
 
         @ b
         
@@ -291,34 +316,37 @@ object AdvancedTests extends TestSuite{
       }
     }
     test("compilerPlugin") - retry(3){
-      if (scala2_11) check.session("""
-        @ // Compiler plugins imported without `.$plugin` are not loaded
+      if (check.scala2)
+        check.session("""
+          @ // Compiler plugins imported without `.$plugin` are not loaded
 
-        @ import $ivy.`org.spire-math::kind-projector:0.6.3`
+          @ import $ivy.`org.typelevel:::kind-projector:0.13.2`
 
-        @ trait TC0[F[_]]
-        defined trait TC0
+          @ trait TC0[F[_]]
+          defined trait TC0
 
-        @ type TC0EitherStr = TC0[Either[String, ?]]
-        error: not found: type ?
+          @ type TC0EitherStr = TC0[Either[String, *]]
+          error: not found: type *
 
-        @ // You need to use `import $plugin.$ivy`
+          @ // You need to use `import $plugin.$ivy`
 
-        @ import $plugin.$ivy.`org.spire-math::kind-projector:0.6.3`
+          @ import $plugin.$ivy.`org.typelevel:::kind-projector:0.13.2`
 
-        @ trait TC[F[_]]
-        defined trait TC
+          @ trait TC[F[_]]
+          defined trait TC
 
-        @ type TCEitherStr = TC[Either[String, ?]]
-        defined type TCEitherStr
+          @ type TCEitherStr = TC[Either[String, *]]
+          defined type TCEitherStr
 
-        @ // Importing plugins doesn't affect the run-time classpath
+          @ // Importing plugins doesn't affect the run-time classpath
 
-        @ import $plugin.$ivy.`com.lihaoyi::scalatags:0.7.0`
+          @ import $plugin.$ivy.`com.lihaoyi::scalatags:0.7.0`
 
-        @ import scalatags.Text
-        error: not found: value scalatags
-      """)
+          @ import scalatags.Text
+          error: not found: value scalatags
+        """)
+      else
+        "Disabled"
     }
     test("replApiUniqueness"){
       // Make sure we can instantiate multiple copies of Interpreter, with each
@@ -351,29 +379,36 @@ object AdvancedTests extends TestSuite{
         }
         else
           "interp.configureCompiler(_.settings.YmacroAnnotations.value = true)"
-      check.session(s"""
-        @ $init
 
-        @ import $$ivy.`io.github.alexarchambault::data-class:0.2.3`
+      if (check.scala2)
+        check.session(s"""
+          @ $init
 
-        @ import dataclass._
-        import dataclass._
+          @ import $$ivy.`io.github.alexarchambault::data-class:0.2.3`
 
-        @ @data class Foo(n: Int = 0)
+          @ import dataclass._
+          import dataclass._
 
-        @ val foo = Foo()
-        foo: Foo = Foo(0)
+          @ @data class Foo(n: Int = 0)
 
-        @ val foo2 = foo.withN(3)
-        foo2: Foo = Foo(3)
+          @ val foo = Foo()
+          foo: Foo = ${Print.Foo(n = 0)}
 
-      """)
+          @ val foo2 = foo.withN(3)
+          foo2: Foo = ${Print.Foo(n = 3)}
+
+        """)
+      else
+        "Disabled in Scala 3"
     }
     test("desugar"){
-      check.session("""
-        @ desugar{1 + 2 max 3}
-        res0: ammonite.repl.tools.Desugared = scala.Predef.intWrapper(3).max(3)
-      """)
+      if (check.scala2)
+        check.session("""
+          @ desugar{1 + 2 max 3}
+          res0: compiler.tools.Desugared = scala.Predef.intWrapper(3).max(3)
+        """)
+      else
+        "Disabled in Scala 3"
     }
     test("loadingModulesInPredef"){
 
@@ -490,8 +525,56 @@ object AdvancedTests extends TestSuite{
       }
     }
 
+<<<<<<< HEAD
+||||||| 05aed517
+    test("loadURL"){
+      val sbv = {
+        val sv = scala.util.Properties.versionNumberString
+        if (sv.forall(c => c.isDigit || c == '.'))
+          sv.split('.').take(2).mkString(".")
+        else
+          sv
+      }
+      val url = "https://repo1.maven.org/maven2/" +
+        s"org/scalacheck/scalacheck_$sbv/1.14.0/scalacheck_$sbv-1.14.0.jar"
+      check.session(s"""
+        @ interp.load.cp(new java.net.URL("$url"))
+
+        @ import org.scalacheck.Gen
+        import org.scalacheck.Gen
+
+        @ val check = Gen.choose(1, 5).sample.exists(_ <= 5)
+        check: Boolean = true
+      """)
+    }
+
+=======
+    test("loadURL"){
+      if (check.scala2) {
+        val sbv = {
+          val sv = if (check.scalaVersion.startsWith("3.")) "2.13" else check.scalaVersion
+          if (sv.forall(c => c.isDigit || c == '.'))
+            sv.split('.').take(2).mkString(".")
+          else
+            sv
+        }
+        val url = "https://repo1.maven.org/maven2/" +
+          s"org/scalacheck/scalacheck_$sbv/1.14.0/scalacheck_$sbv-1.14.0.jar"
+        check.session(s"""
+          @ interp.load.cp(new java.net.URL("$url"))
+
+          @ import org.scalacheck.Gen
+          import org.scalacheck.Gen
+
+          @ val check = Gen.choose(1, 5).sample.exists(_ <= 5)
+          check: Boolean = true
+        """)
+      } else "Disabled in Scala 3"
+    }
+
+>>>>>>> origin/main
     test("accessPressy"){
-      check.session("""
+      if (check.scala2) check.session("""
         @ def typeAt(code: String, pos: Int) = {
         @   import scala.tools.nsc.interactive.Response
         @   import scala.reflect.internal.util.{BatchSourceFile, OffsetPosition}
@@ -513,7 +596,7 @@ object AdvancedTests extends TestSuite{
         t: String = ?
 
         @ assert(t.endsWith(".List"))
-      """)
+      """) else "N/A in Scala 3"
     }
 
     test("accessInMemoryClassMap"){
@@ -537,6 +620,118 @@ object AdvancedTests extends TestSuite{
         @ val found = classes.contains(name)
         found: Boolean = true
       """)
+    }
+
+    test("given"){
+      if (check.scala2) "N/A"
+      else
+        check.session("""
+          @ class Foo
+          defined class Foo
+
+          @ given Ordering[Foo] = new Ordering[Foo] { def compare(a: Foo, b: Foo): Int = 0 }
+          given_Ordering_Foo: Ordering[Foo] = <given>
+
+          @ class Bar
+          defined class Bar
+
+          @ given (using Ordering[Foo]): Ordering[Bar] = {
+          @   new Ordering[Bar] { def compare(a: Bar, b: Bar): Int = 0 }
+          @ }
+          defined function given_Ordering_Bar
+
+          @ given fooOrd: Ordering[Foo] = {
+          @   new Ordering[Foo] { def compare(a: Foo, b: Foo): Int = 0 }
+          @ }
+          fooOrd: Ordering[Foo] = <given>
+        """)
+    }
+    test("extension-methods"){
+      if (scala2) "N/A"
+      else
+        check.session("""
+          @ extension (x: Int) def incr = x + 1
+          defined extension methods
+
+          @ 1.incr
+          res1: Int = 2
+
+          @ {
+          @ extension (x: String)
+          @   def ident = x
+          @   def concat(other: String) = x ++ other
+          @ }
+          defined extension methods
+
+          @ "test".ident
+          res3: String = "test"
+
+          @ "test".concat("test")
+          res4: String = "testtest"
+        """)
+    }
+    test("output-directory") {
+      val dir = os.temp.dir(prefix = "amm-output-dir-test")
+      val predef0 =
+        """val n = 2
+          |""".stripMargin
+      val defaultCheck = new TestRepl(
+        ammonite.compiler.CompilerBuilder(outputDir = Some((dir / "default").toNIO))
+      ) {
+        override def predef = (predef0, None)
+      }
+      val classBasedCheck = new TestRepl(
+        ammonite.compiler.CompilerBuilder(outputDir = Some((dir / "class-based").toNIO))
+      ) {
+        override def predef = (predef0, None)
+        override def codeWrapper = ammonite.compiler.CodeClassWrapper
+      }
+      val session = """
+        @ val check = interp.outputDir.nonEmpty
+        check: Boolean = true
+      """
+      defaultCheck.session(session)
+      classBasedCheck.session(session)
+
+      val expectedClassFiles = Seq(
+        os.rel / "default" / "ammonite" / "predef" / "testPredef.class",
+        os.rel / "default" / "ammonite" / "predef" / "testPredef$.class",
+        os.rel / "default" / "ammonite" / "$sess" / "cmd0.class",
+        os.rel / "default" / "ammonite" / "$sess" / "cmd0$.class",
+        os.rel / "class-based" / "ammonite" / "predef" / "testPredef.class",
+        os.rel / "class-based" / "ammonite" / "predef" / "testPredef$.class",
+        os.rel / "class-based" / "ammonite" / "predef" / "testPredef$Helper.class",
+        os.rel / "class-based" / "ammonite" / "$sess" / "cmd0.class",
+        os.rel / "class-based" / "ammonite" / "$sess" / "cmd0$.class",
+        os.rel / "class-based" / "ammonite" / "$sess" / "cmd0$Helper.class"
+      )
+      val expectedTastyFiles = Seq(
+        os.rel / "default" / "ammonite" / "predef" / "testPredef.tasty",
+        os.rel / "default" / "ammonite" / "$sess" / "cmd0.tasty",
+        os.rel / "class-based" / "ammonite" / "predef" / "testPredef.tasty",
+        os.rel / "class-based" / "ammonite" / "$sess" / "cmd0.tasty"
+      )
+      val expectedFiles =
+        if (ammonite.compiler.CompilerBuilder.scalaVersion.startsWith("2."))
+          expectedClassFiles
+        else
+          expectedClassFiles ++ expectedTastyFiles
+
+      val files = os.walk(dir).filter(os.isFile(_)).map(_.relativeTo(dir))
+      assert(files.sorted == expectedFiles.sorted)
+    }
+    test("comment and import") {
+      check.session(
+        """
+          @ import $ivy.`org.typelevel::cats-kernel:2.6.1`
+
+          @ {
+          @   // hello
+          @   import cats.kernel._
+          @ }
+          import cats.kernel._
+        """
+      )
     }
   }
 }
