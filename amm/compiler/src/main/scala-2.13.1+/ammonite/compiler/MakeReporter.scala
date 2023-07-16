@@ -22,7 +22,7 @@ object MakeReporter {
                    outerSettings: Settings): Reporter =
     new FilteringReporter {
 
-      def doReport(pos: scala.reflect.internal.util.Position,
+      override def doReport(pos: scala.reflect.internal.util.Position,
                    msg: String,
                    severity: Severity): Unit =
         display(pos, msg, severity)
