@@ -7,7 +7,7 @@ ThisBuild / Test / parallelExecution := false
 ThisBuild / evictionErrorLevel := Level.Info
 
 lazy val root = project.in(file("."))
-  .aggregate(terminal, util, interpApi, compiler, compilerInterface, runtime, replApi, repl, interp, amm, shell)
+  .aggregate(terminal, util, interpApi, compiler, compilerInterface, runtime, replApi, repl, interp, amm, shell, integration)
   .settings(
     publish / skip := true,
   )
@@ -52,6 +52,7 @@ val compiler = (project in file("amm/compiler")).settings(
   libraryDependencies += "org.javassist" % "javassist" % "3.21.0-GA",
   Compile / unmanagedSourceDirectories += baseDirectory.value / "src" / "main" / "scala-2.13.1+",
   Compile / unmanagedSourceDirectories += baseDirectory.value / "src" / "main" / "scala-2.12.10-2.13.1+",
+  Test / unmanagedSourceDirectories += baseDirectory.value / "src" / "test" / "scala-2",
 ).dependsOn(util, replApi, compilerInterface)
 
 val runtime = (project in file("amm/runtime")).settings(
@@ -87,4 +88,9 @@ val shell = (project in file("shell")).settings(
   name := "ammonite-shell",
   Test / fork := true,
   Test / envVars := Map("AMMONITE_SHELL" -> (Compile / packageBin).value.toString),
+).dependsOn(amm % "compile->compile;test->test")
+
+val integration = (project in file("integration")).settings(
+  name := "ammonite-integration",
+  libraryDependencies += "com.lihaoyi" %% "cask" % "0.6.0",
 ).dependsOn(amm % "compile->compile;test->test")
