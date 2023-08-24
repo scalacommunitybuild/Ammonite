@@ -82,7 +82,7 @@ val repl = (project in file("amm/repl")).settings(
 val amm = (project in file("amm")).settings(
   name := "ammonite",
   libraryDependencies += "org.scala-lang.modules" %% "scala-java8-compat" % "0.9.0" % Test,
-  libraryDependencies += "com.lihaoyi" %% "acyclic" % "0.3.8",
+  libraryDependencies += "com.lihaoyi" %% "acyclic" % "0.3.8" cross CrossVersion.full,
 ).dependsOn(compiler % "compile->compile;test->test", repl % "compile->compile;test->test")
 
 val shell = (project in file("shell")).settings(
