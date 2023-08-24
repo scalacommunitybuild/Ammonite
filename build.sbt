@@ -60,6 +60,7 @@ val runtime = (project in file("amm/runtime")).settings(
   libraryDependencies += "com.lihaoyi" %% "upickle" % "3.0.0",
   libraryDependencies += "io.get-coursier" % "interface" % "1.0.16",
   libraryDependencies += "io.get-coursier" %% "class-path-util" % "0.1.4",
+  libraryDependencies += "io.get-coursier" %% "dependency-interface" % "0.2.3",
 ).dependsOn(replApi, interpApi)
 
 val interp = (project in file("amm/interp")).settings(
