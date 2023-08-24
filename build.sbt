@@ -67,8 +67,8 @@ val interp = (project in file("amm/interp")).settings(
   name := "ammonite-interp",
   libraryDependencies += "com.lihaoyi" %% "scalaparse" % "3.0.0",
   libraryDependencies += "org.scala-lang.modules" %% "scala-xml" % "2.0.1",
-  libraryDependencies += "ch.epfl.scala" % "bsp4j" % "2.0.0-M6",
-  libraryDependencies += "org.scalameta" %% "trees" % "4.7.8",
+  libraryDependencies += "ch.epfl.scala" % "bsp4j" % "2.1.0-M5",
+  libraryDependencies += "org.scalameta" %% "trees" % "4.8.5",
   Compile / unmanagedSourceDirectories += baseDirectory.value / "src" / "main" / "scala-2.13.1+",
   Compile / unmanagedSourceDirectories += baseDirectory.value / "src" / "main" / "scala-2.12.10-2.13.1+",
 ).dependsOn(runtime, compilerInterface, replApi)
