@@ -196,7 +196,7 @@ object Storage{
     val metadataFile = "metadata.json"
     val sessionFile  = dir/"session"
 
-    def getSessionId() = {
+    def getSessionId = {
       try os.read(sessionFile).toLong
       catch{case e: Throwable =>
         val randomId = math.abs(util.Random.nextLong)
