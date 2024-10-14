@@ -199,13 +199,7 @@ object Storage {
     val metadataFile = "metadata.json"
     val sessionFile = dir / "session"
 
-<<<<<<< HEAD
-    def getSessionId = {
-||||||| 151446c5
-    def getSessionId() = {
-=======
     def getSessionId: Long = {
->>>>>>> origin/main
       try os.read(sessionFile).toLong
       catch {
         case e: Throwable =>

@@ -34,13 +34,7 @@ object HighlightTests extends TestSuite {
       test("fuzz") {
 
         val paths = os.walk(os.pwd).filter(_.ext == "scala")
-<<<<<<< HEAD
-        for(path <- paths if !os.isDir(path)){
-||||||| 151446c5
-        for(path <- paths){
-=======
         for (path <- paths) {
->>>>>>> origin/main
           val code = os.read(path)
           val out = Parsers.defaultHighlight(
             code.toVector,

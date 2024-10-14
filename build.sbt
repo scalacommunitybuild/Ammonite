@@ -25,6 +25,8 @@ val util = (project in file("amm/util")).settings(
   libraryDependencies += "org.scala-lang.modules" %% "scala-collection-compat" % "2.12.0",
   libraryDependencies += "com.lihaoyi" %% "os-lib" % "0.10.7",
   libraryDependencies += "com.lihaoyi" %% "fansi" % "0.5.0",
+  libraryDependencies += "org.tpolecat" %% "typename" % "1.1.0",
+
 )
 
 val compilerInterface = (project in file("amm/compiler/interface")).settings(
@@ -41,6 +43,7 @@ val replApi = (project in file("amm/repl/api")).settings(
   name := "ammonite-repl-api",
   libraryDependencies += "com.lihaoyi" %% "pprint" % "0.9.0",
   libraryDependencies += "com.lihaoyi" %% "mainargs" % "0.7.5",
+  Compile / unmanagedSourceDirectories += baseDirectory.value / "src" / "main" / "scala-2.13-or-3",
 ).dependsOn(interpApi)
 
 val compiler = (project in file("amm/compiler")).settings(
@@ -51,6 +54,7 @@ val compiler = (project in file("amm/compiler")).settings(
   libraryDependencies += "com.github.javaparser" % "javaparser-core" % "3.2.12",
   libraryDependencies += "org.javassist" % "javassist" % "3.21.0-GA",
   Compile / unmanagedSourceDirectories += baseDirectory.value / "src" / "main" / "scala-2.13.1+",
+  Compile / unmanagedSourceDirectories += baseDirectory.value / "src" / "main" / "scala-2.13.12+",
   Compile / unmanagedSourceDirectories += baseDirectory.value / "src" / "main" / "scala-2.12.10-2.13.1+",
   Test / unmanagedSourceDirectories += baseDirectory.value / "src" / "test" / "scala-2",
 ).dependsOn(util, replApi, compilerInterface)
