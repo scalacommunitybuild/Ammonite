@@ -11,8 +11,8 @@ import java.util.Locale
 
 import scala.collection.mutable
 
-class SessionApiImpl(frames0: => StableRef[List[Frame]]) extends Session{
-  def frames = frames0()
+class SessionApiImpl(frames0: => StableRef[List[Frame]]) extends Session {
+  def frames: List[Frame] = frames0()
   val namedFrames = mutable.Map.empty[String, List[Frame]]
 
   def childFrame(parent: Frame) = new Frame(
@@ -42,7 +42,7 @@ class SessionApiImpl(frames0: => StableRef[List[Frame]]) extends Session{
 
   def pop(num: Int = 1) = {
     var next = frames
-    for(i <- 0 until num){
+    for (i <- 0 until num) {
       if (next.tail != Nil) next = next.tail
     }
     val out = SessionChanged.delta(frames.head, next.head)
@@ -52,7 +52,7 @@ class SessionApiImpl(frames0: => StableRef[List[Frame]]) extends Session{
     frames0() = next
     out
   }
-  
+
   def load(name: String = "") = {
     val next = if (name == "") frames.tail else namedFrames(name)
     val out = SessionChanged.delta(frames.head, next.head)
@@ -67,12 +67,12 @@ class SessionApiImpl(frames0: => StableRef[List[Frame]]) extends Session{
     namedFrames.remove(name)
   }
 }
-trait ReplApiImpl extends FullReplAPI{
+trait ReplApiImpl extends FullReplAPI {
 
-  implicit def tprintColorsImplicit = pprint.TPrintColors(
+  implicit def tprintColorsImplicit: pprint.TPrintColors = pprint.TPrintColors(
     typeColor = colors().`type`()
   )
-  implicit val codeColorsImplicit = new CodeColors{
+  implicit val codeColorsImplicit: CodeColors = new CodeColors {
     def comment = colors().comment()
     def `type` = colors().`type`()
     def literal = colors().literal()
@@ -95,10 +95,12 @@ trait ReplApiImpl extends FullReplAPI{
 
   def printer: Printer
 
-  override def show(t: Any,
-                    width: Integer = null,
-                    height: Integer = 9999999,
-                    indent: Integer = null) = {
+  override def show(
+      t: Any,
+      width: Integer = null,
+      height: Integer = 9999999,
+      indent: Integer = null
+  ) = {
 
     pprinter()
       .tokenize(

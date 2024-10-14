@@ -12,7 +12,7 @@ import org.apache.sshd.server.session.ServerSession
  *                    which will serve remote user's shell session.
  */
 private[sshd] class ShellSession(remoteShell: ShellSession.Server)
-  extends Command {
+    extends Command {
   var in: InputStream = _
   var out: OutputStream = _
   var exit: ExitCallback = _
@@ -31,7 +31,7 @@ private[sshd] class ShellSession(remoteShell: ShellSession.Server)
    * called by ssh server to instrument this session
    * with a callback that it finished serving a user
    */
-  override def setExitCallback(exit: ExitCallback) {
+  override def setExitCallback(exit: ExitCallback) = {
     this.exit = exit
   }
 
@@ -52,14 +52,12 @@ private[sshd] class ShellSession(remoteShell: ShellSession.Server)
     thread.interrupt()
   }
 
-
   private def createShellServingThread(): Thread = new Thread {
     override def run(): Unit = {
       remoteShell(in, out)
       exit.onExit(0, "repl finished")
     }
   }
-
 
   // proxy which fixes output to the remote side to be ssh compatible.
   private class SshOutputStream(out: OutputStream) extends OutputStream {

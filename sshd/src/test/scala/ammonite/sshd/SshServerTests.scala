@@ -6,12 +6,11 @@ import utest._
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Promise}
-import scala.language.postfixOps
 import SshTestingUtils._
 
 object SshServerTests extends TestSuite with ScalaCheckSupport {
   override val tests = Tests {
-    test("canConnectAndAuthenticate"){
+    test("canConnectAndAuthenticate") {
       withTmpDirectory { implicit tmpDir =>
         check {
           forAll(genCreds) { user =>
@@ -24,7 +23,7 @@ object SshServerTests extends TestSuite with ScalaCheckSupport {
         }
       }
     }
-    test("cantConnectWithInvalidCredentials"){
+    test("cantConnectWithInvalidCredentials") {
       withTmpDirectory { implicit tmpDir =>
         check {
           forAll(genNonMatchingCredsPair) { credsPair =>
@@ -40,7 +39,7 @@ object SshServerTests extends TestSuite with ScalaCheckSupport {
         }
       }
     }
-    test("thenConnectedExecutesShellTerminalTask"){
+    test("thenConnectedExecutesShellTerminalTask") {
       withTmpDirectory { implicit tmpDir =>
         val remoteShellGetsExecuted = Promise[Unit]()
         def shellSession = () => remoteShellGetsExecuted.success((): Unit)
@@ -49,18 +48,18 @@ object SshServerTests extends TestSuite with ScalaCheckSupport {
           client.connect()
           val shell = new Shell(client)
           shell.connect()
-          Await.result(remoteShellGetsExecuted.future, 5 seconds)
+          Await.result(remoteShellGetsExecuted.future, 5.seconds)
         }
       }
     }
-    test("cantOpenWildChannel"){
+    test("cantOpenWildChannel") {
       withTmpDirectory { implicit tmpDir =>
         withTestSshServer(testUser) { server =>
           val client = sshClient(testUser, server)
           client.connect()
           assert(client.isConnected)
           for (channel <- rejectedChannelTypes) cantConnectToChannel(client, channel)
-          check(forAll { randomChannel:String =>
+          check(forAll { (randomChannel: String) =>
             cantConnectToChannel(client, randomChannel)
           })
         }
@@ -69,12 +68,18 @@ object SshServerTests extends TestSuite with ScalaCheckSupport {
   }
 
   private lazy val rejectedChannelTypes = Seq(
-    "exec", "env", "x11-req", "x11",
-    "subsystem", "exit-signal", "auth-agent-req@openssh.com"
+    "exec",
+    "env",
+    "x11-req",
+    "x11",
+    "subsystem",
+    "exit-signal",
+    "auth-agent-req@openssh.com"
   )
 
-  private def cantConnectToChannel(client: Session, channel: String)
-                                  (implicit dir: os.Path): Unit = {
+  private def cantConnectToChannel(client: Session, channel: String)(implicit
+      dir: os.Path
+  ): Unit = {
     assert(client.isConnected)
     Option(client.openChannel(channel)) match {
       case Some(shell) =>

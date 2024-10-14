@@ -30,7 +30,7 @@
 
   @p
     As an example, Ammonite's own
-    @lnk("Continuous Integration Scripts", "https://github.com/lihaoyi/Ammonite/tree/master/ci")
+    @lnk("Continuous Integration Scripts", "https://github.com/lihaoyi/Ammonite/tree/main/ci")
     are written as @code{.sc} Scala Scripts, as are @lnk("Haoyi's blog",
     "https://github.com/lihaoyi/blog") and @lnk("resume",
     "https://github.com/lihaoyi/Resume"). These are all examples of using
@@ -430,7 +430,7 @@
         and one that pulls out a list of release-names from a given github
         project using Requests-Scala, uPickle's JSON package, and the Github API:
 
-      @hl.ref(wd/'integration/'src/'test/'resources/'ammonite/'integration/'basic/"HttpApi.sc")
+      @hl.ref(wd/"integration"/"src"/"test"/"resources"/"ammonite"/"integration"/"basic"/"HttpApi.sc")
 
       @p
         You can run @code{amm} on the script to see what it can do
@@ -739,7 +739,7 @@
       @p
         In your test directory, create a class like:
 
-      @hl.ref('integration/'src/'test/'scala/'ammonite/'integration/"AmmoniteBridge.scala")
+      @hl.ref("integration"/"src"/"test"/"scala"/"ammonite"/"integration"/"AmmoniteBridge.scala")
 
       @p
         Run your script using @code{sbt "test:run /path/to/script.sc arg1 arg2 arg3"}.
