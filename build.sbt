@@ -1,7 +1,7 @@
-ThisBuild / scalaVersion := "2.13.15"
+ThisBuild / scalaVersion := "2.13.16"
 ThisBuild / organization := "com.lihaoyi"
 ThisBuild / Compile / scalacOptions ++= Seq("-feature", "-deprecation")
-ThisBuild / libraryDependencies += "com.lihaoyi" %% "utest" % "0.8.4" % Test
+ThisBuild / libraryDependencies += "com.lihaoyi" %% "utest" % "0.8.5" % Test
 ThisBuild / testFrameworks := Seq(new TestFramework("utest.runner.Framework"))
 ThisBuild / Test / parallelExecution := false
 ThisBuild / evictionErrorLevel := Level.Info
@@ -14,7 +14,7 @@ lazy val root = project.in(file("."))
 
 val terminal = (project in file("terminal")).settings(
   name := "ammonite-terminal",
-  libraryDependencies += "com.lihaoyi" %% "sourcecode" % "0.4.3-M1",
+  libraryDependencies += "com.lihaoyi" %% "sourcecode" % "0.4.3-M5",
   libraryDependencies += "com.lihaoyi" %% "fansi" % "0.5.0",
   Test / unmanagedResourceDirectories += baseDirectory.value / "src" / "test" / "resource",
 )
@@ -22,8 +22,8 @@ val terminal = (project in file("terminal")).settings(
 val util = (project in file("amm/util")).settings(
   name := "ammonite-util",
   libraryDependencies += "org.scala-lang" % "scala-reflect" % scalaVersion.value,
-  libraryDependencies += "org.scala-lang.modules" %% "scala-collection-compat" % "2.12.0",
-  libraryDependencies += "com.lihaoyi" %% "os-lib" % "0.10.7",
+  libraryDependencies += "org.scala-lang.modules" %% "scala-collection-compat" % "2.13.0",
+  libraryDependencies += "com.lihaoyi" %% "os-lib" % "0.11.4",
   libraryDependencies += "com.lihaoyi" %% "fansi" % "0.5.0",
   libraryDependencies += "org.tpolecat" %% "typename" % "1.1.0",
 
@@ -71,8 +71,9 @@ val interp = (project in file("amm/interp")).settings(
   name := "ammonite-interp",
   libraryDependencies += "com.lihaoyi" %% "scalaparse" % "3.1.1",
   libraryDependencies += "org.scala-lang.modules" %% "scala-xml" % "2.0.1",
-  libraryDependencies += "ch.epfl.scala" % "bsp4j" % "2.1.0-M5",
-  libraryDependencies += "org.scalameta" %% "trees" % "4.9.7",
+  libraryDependencies += "ch.epfl.scala" % "bsp4j" % "2.1.1",
+  libraryDependencies += "org.scalameta" %% "trees" % "4.13.1.1",
+  libraryDependencies += "org.scalameta" % "semanticdb-scalac" % "4.13.1.1" cross CrossVersion.full,
   Compile / unmanagedSourceDirectories += baseDirectory.value / "src" / "main" / "scala-2.13.1+",
   Compile / unmanagedSourceDirectories += baseDirectory.value / "src" / "main" / "scala-2.12.10-2.13.1+",
 ).dependsOn(runtime, compilerInterface, replApi)
@@ -86,7 +87,7 @@ val repl = (project in file("amm/repl")).settings(
 val amm = (project in file("amm")).settings(
   name := "ammonite",
   libraryDependencies += "org.scala-lang.modules" %% "scala-java8-compat" % "1.0.2" % Test,
-  libraryDependencies += "com.lihaoyi" %% "acyclic" % "0.3.15" cross CrossVersion.full,
+  libraryDependencies += "com.lihaoyi" %% "acyclic" % "0.3.16" cross CrossVersion.full,
 ).dependsOn(compiler % "compile->compile;test->test", repl % "compile->compile;test->test")
 
 val shell = (project in file("shell")).settings(
@@ -97,5 +98,5 @@ val shell = (project in file("shell")).settings(
 
 val integration = (project in file("integration")).settings(
   name := "ammonite-integration",
-  libraryDependencies += "com.lihaoyi" %% "cask" % "0.9.1",
+  libraryDependencies += "com.lihaoyi" %% "cask" % "0.10.2",
 ).dependsOn(amm % "compile->compile;test->test")
