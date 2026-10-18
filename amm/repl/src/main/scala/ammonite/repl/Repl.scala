@@ -188,7 +188,9 @@ class Repl(
       // than the stack trace of *the mainThread*
       lastException = new ThreadDeath()
       lastException.setStackTrace(Repl.truncateStackTrace(interp.mainThread.getStackTrace))
-      interp.mainThread.stop()
+      // Thread.stop throws on JDK 20+ and is gone in JDK 26+
+      try classOf[Thread].getMethod("stop").invoke(interp.mainThread)
+      catch { case _: ReflectiveOperationException => interp.mainThread.interrupt() }
     }
     (code, stmts) <- frontEnd().action(
       input,
